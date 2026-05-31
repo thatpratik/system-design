@@ -1,2 +1,2 @@
-# system-design
+# System-design
 Learning system design
