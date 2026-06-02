@@ -1,0 +1,79 @@
+---
+title: "URL Shortener"
+slug: "url-shortener"
+category: "networking"
+summary: "Converts long URLs into short aliases and redirects users to the original URL on access."
+components:
+  - "load-balancer"
+  - "caching"
+externalLinks:
+  - label: "How bit.ly works"
+    url: "https://bitly.com/pages/resources"
+  - label: "System Design — URL Shortener (ByteByteGo)"
+    url: "https://bytebytego.com/courses/system-design-interview/design-a-url-shortener"
+---
+
+## What is a URL Shortener?
+
+A URL shortener maps a long URL to a short alias (e.g. `short.ly/abc123`). When a user visits the short URL, they are redirected to the original URL via an HTTP 301 or 302 response.
+
+## Core Requirements
+
+**Functional**
+- Generate a unique short URL for any given long URL
+- Redirect short URL to original URL with low latency
+- Short URLs should be human-friendly (alphanumeric, 6–8 characters)
+
+**Non-functional**
+- High availability — shortener must be always reachable
+- Low redirect latency — users should not notice the redirect
+- Scale to billions of short URLs
+
+## High-Level Architecture
+
+```
+Client → Load Balancer → App Servers → Cache → Database
+```
+
+1. **Write path**: Client submits long URL → App server generates short key → Store mapping in DB → Return short URL
+2. **Read path**: Client visits short URL → App server looks up cache → On miss, looks up DB → Issue HTTP redirect
+
+## Key Design Decisions
+
+### Short key generation
+
+Two common approaches:
+
+| Approach | How | Trade-off |
+|---|---|---|
+| **Hash-based** | MD5/SHA256 the long URL, take first N chars | Possible collisions, deterministic (same URL = same key) |
+| **Counter-based** | Auto-increment ID, encode to base62 | No collisions, sequential IDs expose volume |
+
+Base62 encoding (`a-z A-Z 0-9`) gives 62^7 ≈ 3.5 trillion unique keys at 7 characters.
+
+### Redirect type
+
+- **301 Permanent** — browser caches the redirect. Reduces load, but prevents analytics tracking.
+- **302 Temporary** — browser always hits the shortener. Enables click analytics.
+
+### Database schema
+
+```sql
+CREATE TABLE urls (
+  id         BIGINT PRIMARY KEY,
+  short_key  VARCHAR(8) UNIQUE NOT NULL,
+  long_url   TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+## Components Used
+
+- **[Load Balancer](/components/load-balancer)** — distributes redirect traffic across app server replicas
+- **[Caching](/components/caching)** — caches hot `short_key → long_url` mappings; redirect path becomes sub-millisecond
+
+## Scaling Considerations
+
+- **Read-heavy**: 100:1 read-to-write ratio is typical. Cache absorbs almost all reads.
+- **Database**: A single relational DB works up to ~100M URLs. Beyond that, consider consistent hashing + sharding by short key.
+- **Rate limiting**: Without it, a single client can exhaust the key space or DoS the write path.

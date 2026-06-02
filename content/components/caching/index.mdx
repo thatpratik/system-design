@@ -1,0 +1,65 @@
+---
+title: "Caching"
+slug: "caching"
+category: "storage"
+summary: "Stores copies of expensive computation or frequently accessed data in fast memory to reduce latency and database load."
+usedIn:
+  - "url-shortener"
+alternatives:
+  - "cdn"
+externalLinks:
+  - label: "Redis Documentation"
+    url: "https://redis.io/docs/"
+  - label: "AWS ElastiCache"
+    url: "https://aws.amazon.com/elasticache/"
+---
+
+## What is Caching?
+
+A cache is a high-speed data store that holds a subset of data — typically the most frequently read or recently computed results. Reads hit the cache first; only on a miss does the request fall through to the origin (database, API, or computation).
+
+## Problem it Solves
+
+Databases are slow relative to memory. Repeated reads of the same data waste I/O and CPU. Caching absorbs read traffic so databases handle only what's necessary.
+
+## Cache Hit vs Miss
+
+- **Hit**: The requested key exists in the cache. Data is returned immediately.
+- **Miss**: Key not in cache. Request falls through to origin, result is stored in cache for next time.
+
+**Hit rate** is the primary health metric: `hits / (hits + misses)`. A healthy cache hit rate is typically above 90%.
+
+## Eviction Policies
+
+When the cache is full, old entries must be removed:
+
+| Policy | Behaviour |
+|---|---|
+| **LRU** (Least Recently Used) | Evicts the entry not accessed for the longest time |
+| **LFU** (Least Frequently Used) | Evicts the entry with the fewest total accesses |
+| **TTL** (Time To Live) | Evicts entries after a fixed expiry time |
+| **FIFO** | Evicts the oldest inserted entry |
+
+## Caching Strategies
+
+| Strategy | Write behaviour | Best for |
+|---|---|---|
+| **Cache-aside** | App reads cache, on miss reads DB and populates cache | Read-heavy workloads |
+| **Write-through** | Write to cache and DB synchronously | Strong consistency |
+| **Write-behind** | Write to cache, async flush to DB | Write-heavy, tolerate brief inconsistency |
+| **Read-through** | Cache fetches from DB on miss automatically | Simpler app code |
+
+## Trade-offs
+
+| | Benefit | Cost |
+|---|---|---|
+| **Latency** | Sub-millisecond reads vs tens of ms for DB | Stale data if invalidation fails |
+| **Throughput** | DB handles far fewer queries | Cache invalidation is hard to get right |
+| **Cost** | Fewer DB reads = lower DB scaling costs | Memory is expensive at large scale |
+| **Simplicity** | Read path is simple | Consistency bugs are subtle |
+
+## Real-World Usage
+
+- **Redis** — in-memory key/value store, supports TTL, pub/sub, and data structures
+- **Memcached** — simpler, multi-threaded, pure key/value
+- **CDN edge caches** — geographic distribution of static assets

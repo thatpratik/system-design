@@ -1,0 +1,60 @@
+---
+title: "Load Balancer"
+slug: "load-balancer"
+category: "networking"
+summary: "Distributes incoming network traffic across multiple servers to ensure no single server becomes a bottleneck."
+usedIn:
+  - "url-shortener"
+alternatives:
+  - "api-gateway"
+externalLinks:
+  - label: "NGINX Load Balancing"
+    url: "https://docs.nginx.com/nginx/admin-guide/load-balancer/http-load-balancer/"
+  - label: "AWS Elastic Load Balancing"
+    url: "https://aws.amazon.com/elasticloadbalancing/"
+---
+
+## What is a Load Balancer?
+
+A load balancer sits between clients and a pool of servers. Every incoming request hits the load balancer first, which then forwards it to one of the available servers based on a routing algorithm.
+
+## Problem it Solves
+
+A single server has finite CPU, memory, and network capacity. As traffic grows, a single machine becomes a bottleneck — or a single point of failure. A load balancer solves both problems simultaneously.
+
+## How it Works
+
+1. Client sends a request to the load balancer's IP (or DNS name)
+2. Load balancer selects a backend server using its algorithm
+3. Request is forwarded; response is relayed back to the client
+
+The client never knows which backend handled its request.
+
+## Algorithms
+
+| Algorithm | How it works | Best for |
+|---|---|---|
+| **Round Robin** | Rotates through servers in order | Homogeneous servers, even request cost |
+| **Least Connections** | Sends to the server with fewest active connections | Long-lived connections (WebSockets) |
+| **IP Hash** | Hashes client IP to always hit the same server | Session stickiness without shared state |
+| **Weighted Round Robin** | Round robin but servers get proportional traffic | Mixed server capacities |
+
+## Layer 4 vs Layer 7
+
+- **Layer 4 (Transport)**: Routes based on IP/TCP. Fast, but no visibility into request content.
+- **Layer 7 (Application)**: Routes based on HTTP headers, URL, cookies. Enables path-based routing, A/B testing, and SSL termination.
+
+## Trade-offs
+
+| | Benefit | Cost |
+|---|---|---|
+| **Availability** | Removes single point of failure | Adds a new single point of failure (mitigated by HA pairs) |
+| **Scalability** | Enables horizontal scaling | Stateless servers required (or sticky sessions) |
+| **Performance** | Spreads load evenly | Small added latency per hop |
+| **Flexibility** | Health checks remove dead servers automatically | Operational complexity increases |
+
+## Real-World Usage
+
+- **NGINX / HAProxy** — software load balancers deployed on VMs
+- **AWS ALB / NLB** — managed cloud load balancers
+- **Cloudflare** — global anycast load balancing at the DNS level
