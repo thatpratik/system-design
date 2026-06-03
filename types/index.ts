@@ -16,6 +16,11 @@ export interface ComponentMeta {
   /** slugs of alternative components for comparison */
   alternatives: string[];
   externalLinks: ExternalLink[];
+  /** structured comparison fields */
+  strengths?: string[];
+  weaknesses?: string[];
+  bestFor?: string[];
+  notFor?: string[];
 }
 
 export interface SystemMeta {

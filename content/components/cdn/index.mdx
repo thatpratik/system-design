@@ -1,0 +1,76 @@
+---
+title: "CDN"
+slug: "cdn"
+category: "networking"
+summary: "Distributes static and cacheable content across geographically distributed edge nodes so users are served from the nearest location."
+usedIn: []
+alternatives:
+  - "caching"
+externalLinks:
+  - label: "Cloudflare CDN"
+    url: "https://www.cloudflare.com/learning/cdn/what-is-a-cdn/"
+  - label: "AWS CloudFront"
+    url: "https://aws.amazon.com/cloudfront/"
+strengths:
+  - "Serves content from the edge node closest to the user"
+  - "Absorbs massive traffic spikes without touching origin"
+  - "Built-in DDoS protection at many providers"
+  - "Reduces origin bandwidth costs significantly"
+weaknesses:
+  - "Only effective for cacheable, mostly-static content"
+  - "Cache invalidation can take minutes to propagate globally"
+  - "Adds vendor dependency and cost at scale"
+  - "Dynamic, personalised content bypasses the cache entirely"
+bestFor:
+  - "Static assets — JS bundles, CSS, images, fonts"
+  - "Video streaming and large file downloads"
+  - "Global products where latency to every region matters"
+  - "Public APIs with high read volume and low write frequency"
+notFor:
+  - "User-specific or session-scoped data"
+  - "Real-time data that changes faster than the TTL"
+  - "Reducing database load from dynamic query results"
+  - "Internal services not exposed to the public internet"
+---
+
+## What is a CDN?
+
+A Content Delivery Network is a globally distributed network of proxy servers (edge nodes) that cache copies of content close to end users. When a user requests a resource, the CDN routes them to the nearest edge node rather than the origin server.
+
+## Problem it Solves
+
+Latency is fundamentally limited by the speed of light. A user in Tokyo fetching assets from a server in Virginia will always be slower than fetching from a node in Tokyo. CDNs eliminate that distance penalty for cacheable content.
+
+## How it Works
+
+1. DNS resolves the CDN hostname to the nearest edge node (anycast or GeoDNS)
+2. Edge node checks its local cache
+3. **Hit**: content returned immediately from the edge
+4. **Miss**: edge fetches from origin, caches it, returns to user
+5. Subsequent requests from nearby users are served from the edge cache
+
+## Cache Control
+
+CDNs respect HTTP cache headers set by the origin:
+
+| Header | Effect |
+|---|---|
+| `Cache-Control: max-age=86400` | Cache for 24 hours |
+| `Cache-Control: no-store` | Never cache |
+| `Surrogate-Control` | CDN-only TTL, stripped before reaching browser |
+| `ETag` / `Last-Modified` | Conditional revalidation |
+
+## Trade-offs
+
+| | Benefit | Cost |
+|---|---|---|
+| **Latency** | Edge serves in single-digit ms | Dynamic content still hits origin |
+| **Availability** | Edge serves cached content even if origin is down | Cache must be warm — cold misses still hit origin |
+| **Cost** | Reduces origin egress and compute | CDN bandwidth has its own pricing |
+| **Security** | WAF and DDoS protection at edge | Another layer to configure and audit |
+
+## Real-World Usage
+
+- **Cloudflare** — CDN, DDoS, WAF, DNS, all in one
+- **AWS CloudFront** — tight integration with S3, ALB, Lambda@Edge
+- **Fastly** — programmable CDN with VCL / Compute@Edge

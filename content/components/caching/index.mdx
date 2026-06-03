@@ -12,6 +12,25 @@ externalLinks:
     url: "https://redis.io/docs/"
   - label: "AWS ElastiCache"
     url: "https://aws.amazon.com/elasticache/"
+strengths:
+  - "Sub-millisecond read latency for hot data"
+  - "Works for dynamic, computed, and personalised data"
+  - "Flexible eviction policies (LRU, TTL, LFU)"
+  - "Reduces database load dramatically on read-heavy workloads"
+weaknesses:
+  - "Cache invalidation is hard to get right"
+  - "Stale data is possible between writes"
+  - "Memory is expensive at large scale"
+  - "No geographic distribution — single region unless replicated"
+bestFor:
+  - "Session storage and user-specific data"
+  - "Database query result caching"
+  - "Rate limit counters and leaderboards"
+  - "Computed aggregates refreshed on a schedule"
+notFor:
+  - "Large binary files (images, videos)"
+  - "Data that must always be fresh with zero tolerance for staleness"
+  - "Distributing content to users in many geographic regions"
 ---
 
 ## What is Caching?

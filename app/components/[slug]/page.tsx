@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ExternalLink, ArrowLeft } from "lucide-react";
+import { ExternalLink, ArrowLeft, ArrowLeftRight } from "lucide-react";
 import type { Metadata } from "next";
 import { getComponent, getAllComponents, getSystemsBySlug, getComponentsBySlug } from "@/lib/content";
 import { MdxContent } from "@/components/shared/mdx-content";
@@ -113,6 +113,13 @@ export default async function ComponentPage({ params }: Props) {
                         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground shrink-0" />
                         {c.title}
                         <ArrowLeft className="h-3 w-3 rotate-180 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
+                      <Link
+                        href={`/components/compare?a=${meta.slug}&b=${c.slug}`}
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors ml-3.5 mt-0.5"
+                      >
+                        <ArrowLeftRight className="h-3 w-3" />
+                        Compare
                       </Link>
                     </li>
                   ))}

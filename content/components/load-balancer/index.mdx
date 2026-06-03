@@ -12,6 +12,26 @@ externalLinks:
     url: "https://docs.nginx.com/nginx/admin-guide/load-balancer/http-load-balancer/"
   - label: "AWS Elastic Load Balancing"
     url: "https://aws.amazon.com/elasticloadbalancing/"
+strengths:
+  - "Extremely low added latency (microseconds)"
+  - "Transparent to clients — single IP/hostname"
+  - "Automatic health checks remove dead backends"
+  - "Scales to millions of requests per second"
+weaknesses:
+  - "No application-layer awareness (Layer 4) or limited (Layer 7)"
+  - "Does not handle auth, rate limiting, or request transformation"
+  - "Itself becomes a single point of failure without HA pairs"
+  - "Sticky sessions complicate horizontal scaling"
+bestFor:
+  - "High-throughput TCP/HTTP traffic distribution"
+  - "Eliminating backend single points of failure"
+  - "Homogeneous server fleets needing even traffic spread"
+  - "WebSocket and long-lived connection balancing"
+notFor:
+  - "Fine-grained API routing by path or method"
+  - "Authentication and authorisation enforcement"
+  - "Protocol translation (REST ↔ gRPC)"
+  - "Per-client rate limiting"
 ---
 
 ## What is a Load Balancer?

@@ -1,0 +1,88 @@
+---
+title: "API Gateway"
+slug: "api-gateway"
+category: "networking"
+summary: "Single entry point for all client requests that handles routing, authentication, rate limiting, and protocol translation."
+usedIn: []
+alternatives:
+  - "load-balancer"
+externalLinks:
+  - label: "AWS API Gateway"
+    url: "https://aws.amazon.com/api-gateway/"
+  - label: "Kong Gateway"
+    url: "https://konghq.com/products/kong-gateway"
+strengths:
+  - "Centralises cross-cutting concerns (auth, rate limiting, logging)"
+  - "Supports path-based and method-based routing"
+  - "Protocol translation — REST, gRPC, WebSocket from one endpoint"
+  - "Fine-grained per-client or per-route rate limiting"
+weaknesses:
+  - "Adds latency compared to a raw load balancer"
+  - "Can become a bottleneck or single point of failure if not HA"
+  - "More complex to operate — config, plugins, upgrades"
+  - "Overkill for simple homogeneous backend fleets"
+bestFor:
+  - "Microservices architectures needing a unified public API"
+  - "Enforcing authentication and authorisation at the perimeter"
+  - "Multi-tenant APIs with per-client rate limits"
+  - "Protocol bridging (mobile clients → internal gRPC services)"
+notFor:
+  - "Pure traffic distribution to identical backend instances"
+  - "Ultra-low-latency paths where every microsecond counts"
+  - "Internal service-to-service traffic (use a service mesh instead)"
+  - "Simple single-service deployments"
+---
+
+## What is an API Gateway?
+
+An API Gateway is a server that acts as the single entry point into a system. All client requests pass through it before reaching any backend service. It sits at the boundary between external clients and internal services.
+
+## Problem it Solves
+
+Microservices architectures scatter cross-cutting concerns — authentication, logging, rate limiting — across dozens of services. An API Gateway centralises all of this so individual services stay focused on business logic.
+
+## How it Works
+
+1. Client sends a request to the gateway endpoint
+2. Gateway authenticates the request (JWT, API key, OAuth)
+3. Gateway enforces rate limits and quotas
+4. Gateway routes to the correct backend service based on path/method
+5. Response is returned (optionally transformed) to the client
+
+## Key Capabilities
+
+| Feature | What it provides |
+|---|---|
+| **Authentication** | Validates tokens before requests reach services |
+| **Rate limiting** | Per-client, per-route, or global throttling |
+| **Routing** | Path/method/header-based forwarding rules |
+| **Transformation** | Request/response header and body rewriting |
+| **Observability** | Centralised access logs, metrics, tracing |
+| **SSL termination** | Decrypts HTTPS at the edge |
+
+## API Gateway vs Load Balancer
+
+| Dimension | API Gateway | Load Balancer |
+|---|---|---|
+| OSI layer | Layer 7 (Application) | Layer 4 or 7 |
+| Routing basis | Path, method, headers | IP, round-robin, connections |
+| Auth enforcement | Yes | No |
+| Rate limiting | Yes, per-client | No |
+| Protocol translation | Yes | No |
+| Added latency | ~1–5 ms | ~0.1 ms |
+
+## Trade-offs
+
+| | Benefit | Cost |
+|---|---|---|
+| **Security** | Single enforcement point for auth | Gateway misconfiguration affects all APIs |
+| **Flexibility** | Rich routing and transformation | Higher operational complexity |
+| **Observability** | Unified logs across all services | Another system to monitor |
+| **Scalability** | Horizontal scaling like any stateless service | Can become a bottleneck at very high RPS |
+
+## Real-World Usage
+
+- **AWS API Gateway** — managed, pay-per-request, tight Lambda integration
+- **Kong** — open-source, plugin ecosystem, runs on any infrastructure
+- **Traefik** — cloud-native, auto-discovery from Docker/Kubernetes labels
+- **Nginx** — often used as a lightweight gateway with Lua scripting
