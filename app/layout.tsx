@@ -20,6 +20,7 @@ export const metadata: Metadata = {
   },
   description:
     "Interactive system design learning platform — visualize systems and their underlying components.",
+  icons: { icon: "/icon.svg" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
