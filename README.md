@@ -1,19 +1,74 @@
 # System Design
 
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![Bun](https://img.shields.io/badge/Bun-latest-fbf0df?logo=bun&logoColor=black)](https://bun.sh)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v3-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)](https://react.dev)
+
 An interactive learning platform for exploring system design patterns — browse full system architectures, drill into individual building blocks, compare alternatives, and visualise relationships across a knowledge graph.
 
-## Tech Stack
+---
+
+## ✨ Features
+
+| | Feature | Description |
+|---|---|---|
+| 📖 | **System Deep-Dives** | Full MDX articles with interactive React Flow architecture diagrams |
+| 🧩 | **Component Library** | Reusable building blocks with strengths, weaknesses, and best-fit guidance |
+| ⚖️ | **Side-by-Side Compare** | Pick any two components and compare them across four structured dimensions |
+| 🔍 | **Cmd+K Search** | Fuzzy full-text search across all systems and components via Fuse.js |
+| 🕸️ | **Knowledge Graph** | D3 force-directed graph visualising every system↔component relationship |
+| 🔗 | **Bidirectional Links** | Systems list their components; components list the systems that use them |
+
+---
+
+## 🗺️ Architecture
+
+All content lives in MDX files — no database, no CMS. Everything is read from the filesystem at build time and fed into a typed content pipeline.
+
+```mermaid
+flowchart TD
+    accTitle: Content Pipeline Architecture
+    accDescr: MDX files are parsed at build time by gray-matter, processed through lib/content.ts, and power four output surfaces: system pages, component pages, the Fuse.js search index, and the D3 knowledge graph.
+
+    mdx_systems["📄 content/systems/\n&lt;slug&gt;/index.mdx"]
+    mdx_components["📄 content/components/\n&lt;slug&gt;/index.mdx"]
+    parser["⚙️ gray-matter\nfrontmatter parser"]
+    content_ts["lib/content.ts\ngetAllSystems · getAllComponents\nbuildSearchIndex · buildGraphData"]
+
+    mdx_systems --> parser
+    mdx_components --> parser
+    parser --> content_ts
+
+    content_ts --> systems_page["🖥️ /systems\n/systems/[slug]"]
+    content_ts --> components_page["🧩 /components\n/components/[slug]\n/components/compare"]
+    content_ts --> search_idx["🔍 Fuse.js\nSearch Index"]
+    content_ts --> graph_data["🕸️ D3\nKnowledge Graph"]
+
+    classDef file fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
+    classDef lib fill:#f3e8ff,stroke:#7c3aed,stroke-width:2px,color:#3b0764
+    classDef page fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
+
+    class mdx_systems,mdx_components file
+    class parser,content_ts lib
+    class systems_page,components_page,search_idx,graph_data page
+```
+
+---
+
+## 📦 Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Framework | Next.js 15 (App Router) |
-| Language | TypeScript |
+| Language | TypeScript 5 |
 | Package manager | Bun |
 | Styling | Tailwind CSS v3 + `@tailwindcss/typography` |
 | UI components | shadcn/ui (Radix UI primitives) |
 | Icons | Lucide React |
 | Fonts | Geist Sans + Geist Mono |
-| Content | MDX — `next-mdx-remote/rsc` |
+| Content | MDX via `next-mdx-remote/rsc` |
 | Syntax highlighting | `rehype-pretty-code` + Shiki |
 | Markdown extras | `remark-gfm` |
 | Frontmatter parsing | `gray-matter` |
@@ -22,16 +77,170 @@ An interactive learning platform for exploring system design patterns — browse
 | Interactive diagrams | React Flow (`@xyflow/react`) |
 | Knowledge graph | D3.js v7 (force-directed) |
 
-## Commands
+---
+
+## 🚀 Quick Start
 
 ```bash
-bun dev      # dev server at localhost:3000 (Turbopack)
-bun build    # production build
-bun start    # serve production build
-bun lint     # ESLint via next lint
+bun install        # install dependencies
+bun dev            # dev server at http://localhost:3000 (Turbopack)
+bun build          # production build
+bun start          # serve production build
+bun lint           # ESLint via next lint
 ```
 
-## Project Structure
+---
+
+## 🧩 Content Model
+
+Systems and components are bidirectionally linked through frontmatter. A system declares the components it uses; each component declares which systems use it and what its alternatives are. The comparison fields (`strengths`, `weaknesses`, `bestFor`, `notFor`) power the `/components/compare` page.
+
+```mermaid
+erDiagram
+    accTitle: Content Model — System and Component Relationships
+    accDescr: Systems have a components array pointing to components by slug. Components have a usedIn array pointing back to systems, and an alternatives array pointing to comparable components. Both share category, title, slug, summary, and externalLinks fields.
+
+    SYSTEM {
+        string title
+        string slug
+        string category
+        string summary
+        string[] components
+        ExternalLink[] externalLinks
+    }
+
+    COMPONENT {
+        string title
+        string slug
+        string category
+        string summary
+        string[] usedIn
+        string[] alternatives
+        string[] strengths
+        string[] weaknesses
+        string[] bestFor
+        string[] notFor
+        ExternalLink[] externalLinks
+    }
+
+    SYSTEM ||--o{ COMPONENT : "uses via components[]"
+    COMPONENT }o--|| SYSTEM : "appears in via usedIn[]"
+    COMPONENT }o--o{ COMPONENT : "compared via alternatives[]"
+```
+
+### System frontmatter
+
+```yaml
+title: "URL Shortener"
+slug: "url-shortener"
+category: "networking"        # storage | messaging | compute | networking | coordination | observability
+summary: "One-line description"
+components:
+  - "load-balancer"
+  - "caching"
+externalLinks:
+  - label: "Link text"
+    url: "https://..."
+```
+
+### Component frontmatter
+
+```yaml
+title: "Caching"
+slug: "caching"
+category: "storage"
+summary: "One-line description"
+usedIn:
+  - "url-shortener"
+alternatives:
+  - "cdn"
+strengths:
+  - "Sub-millisecond read latency for hot data"
+weaknesses:
+  - "Cache invalidation is hard to get right"
+bestFor:
+  - "Database query result caching"
+notFor:
+  - "Large binary files (images, videos)"
+externalLinks:
+  - label: "Link text"
+    url: "https://..."
+```
+
+---
+
+## 🕸️ Knowledge Graph
+
+Every system and component becomes a node. Edges flow from system → component, forming a navigable web of relationships visible at `/graph`.
+
+```mermaid
+graph LR
+    accTitle: Knowledge Graph — Sample Relationships
+    accDescr: Sample showing how the URL Shortener system connects to its component building blocks via directed edges, and how components relate to one another as alternatives.
+
+    url_shortener["🔗 URL Shortener\n(system)"]
+    load_balancer["⚖️ Load Balancer"]
+    caching["⚡ Caching"]
+    cdn["🌐 CDN"]
+    api_gateway["🚪 API Gateway"]
+
+    url_shortener --> load_balancer
+    url_shortener --> caching
+    url_shortener --> cdn
+    url_shortener --> api_gateway
+
+    load_balancer <-.->|alternatives| api_gateway
+    caching <-.->|alternatives| cdn
+
+    classDef system fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#3b0764
+    classDef component fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#064e3b
+
+    class url_shortener system
+    class load_balancer,caching,cdn,api_gateway component
+```
+
+The live graph supports drag-to-reposition, scroll/pinch to zoom, and click-to-navigate.
+
+---
+
+## 🧭 User Flows
+
+```mermaid
+flowchart TD
+    accTitle: User Navigation Flows
+    accDescr: Five main journeys through the platform — browse systems, browse components, compare two components side by side, use Cmd+K search, and explore the force-directed knowledge graph.
+
+    home["🏠 /\nHome"]
+
+    home --> systems_list["/systems\nall systems by category"]
+    home --> components_list["/components\nall components by category"]
+    home --> graph_page["/graph\nknowledge graph"]
+    home -->|"Cmd+K"| search["🔍 Search Palette\nFuse.js fuzzy search"]
+
+    systems_list --> system_detail["/systems/[slug]\nMDX article · React Flow diagram\nlinked components · external refs"]
+    system_detail -->|"linked component"| component_detail
+
+    components_list --> component_detail["/components/[slug]\nMDX article · diagram\nalternatives · systems using it"]
+    component_detail -->|"Compare →"| compare["/components/compare\nside-by-side: bestFor\nstrengths · weaknesses · notFor"]
+    components_list --> compare
+
+    search -->|"select result"| system_detail
+    search -->|"select result"| component_detail
+    graph_page -->|"click node"| system_detail
+    graph_page -->|"click node"| component_detail
+
+    classDef nav fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
+    classDef content fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
+    classDef feature fill:#fce7f3,stroke:#db2777,stroke-width:2px,color:#831843
+
+    class home,systems_list,components_list nav
+    class system_detail,component_detail,compare content
+    class search,graph_page feature
+```
+
+---
+
+## 🗂️ Project Structure
 
 ```
 app/                          # Next.js App Router pages
@@ -75,99 +284,30 @@ types/
   index.ts                    # SystemMeta, ComponentMeta, ExternalLink, GraphNode, GraphEdge
 ```
 
-## Content Model
+---
 
-All content lives in MDX files. There is no database or CMS — everything is read from the filesystem at build time.
-
-### System frontmatter
-
-```yaml
-title: "URL Shortener"
-slug: "url-shortener"
-category: "networking"        # storage | messaging | compute | networking | coordination | observability
-summary: "One-line description"
-components:                   # slugs of components this system uses
-  - "load-balancer"
-  - "caching"
-externalLinks:
-  - label: "Link text"
-    url: "https://..."
-```
-
-### Component frontmatter
-
-```yaml
-title: "Caching"
-slug: "caching"
-category: "storage"
-summary: "One-line description"
-usedIn:                       # slugs of systems that use this component
-  - "url-shortener"
-alternatives:                 # slugs of comparable components
-  - "cdn"
-externalLinks:
-  - label: "Link text"
-    url: "https://..."
-# Structured comparison fields (used on /components/compare)
-strengths:
-  - "Sub-millisecond read latency for hot data"
-weaknesses:
-  - "Cache invalidation is hard to get right"
-bestFor:
-  - "Database query result caching"
-notFor:
-  - "Large binary files (images, videos)"
-```
-
-Systems and components are bidirectionally linked — a system lists its components, and each component lists the systems it appears in. The comparison fields power the `/components/compare` page.
-
-## User Flows
-
-### Browse systems
-1. Land on `/` — the home page lists entry points for Systems and Components.
-2. Navigate to `/systems` — all systems grouped by category.
-3. Click a system card → `/systems/[slug]` — full MDX article, interactive architecture diagram, linked component breakdown, and external resources.
-4. Click any linked component → `/components/[slug]`.
-
-### Browse components
-1. Navigate to `/components` — all building blocks grouped by category.
-2. Click a component card → `/components/[slug]` — full MDX article, interactive diagram, list of systems that use it, alternatives, and external links.
-3. Under **Alternatives**, click **Compare** → goes directly to the compare page pre-filled for that pair.
-
-### Compare components
-1. Navigate to `/components/compare` — two dropdowns let you pick any two components.
-2. Select a pair and click **Compare**, or arrive via a direct link (`?a=caching&b=cdn`).
-3. The comparison page shows:
-   - A header card per component (category, title, summary)
-   - Four structured rows side by side: **Best for**, **Strengths**, **Weaknesses**, **Not for**
-   - External links for each component
-4. Click **Change selection** to return to the picker.
-
-### Search (Cmd+K)
-1. Press `Cmd+K` (or click the search bar in the header) — a command palette opens.
-2. Type any query — Fuse.js fuzzy-searches titles, summaries, and categories across all systems and components.
-3. Results are grouped by type (Systems / Components) with keyboard navigation.
-4. Press `Enter` or click a result to navigate to that page.
-
-### Knowledge graph
-1. Navigate to `/graph` via the header.
-2. A D3 force-directed graph renders all systems (violet nodes) and components (emerald nodes) with directed edges showing which components each system uses.
-3. **Drag** any node to reposition it.
-4. **Scroll / pinch** to zoom in and out; **drag the canvas** to pan.
-5. **Click** any node to navigate to its detail page.
-
-## Adding Content
+## ➕ Adding Content
 
 ### New system
 
-1. Create `content/systems/<slug>/index.mdx` with the frontmatter above.
+1. Create `content/systems/<slug>/index.mdx` with the System frontmatter above.
 2. List the component slugs it uses under `components:`.
 3. Add the system's slug to `usedIn:` in each referenced component's frontmatter.
-4. The system appears automatically on `/systems`, `/systems/[slug]`, the search index, and the knowledge graph.
+4. The system appears automatically on `/systems`, `/systems/[slug]`, search, and the knowledge graph.
 
 ### New component
 
-1. Create `content/components/<slug>/index.mdx` with the frontmatter above.
+1. Create `content/components/<slug>/index.mdx` with the Component frontmatter above.
 2. Add the component's slug to `components:` in any system that uses it.
-3. If the component has a React Flow diagram, create it in `components/visualizations/` and register it in the `componentVisualizations` map in `app/components/[slug]/page.tsx`.
+3. Optionally create a React Flow diagram in `components/visualizations/` and register it in `app/components/[slug]/page.tsx`.
 4. The component appears automatically on `/components`, `/components/[slug]`, search, compare, and the graph.
+
+### Categories
+
+`storage` · `messaging` · `compute` · `networking` · `coordination` · `observability`
+
+---
+
+## 📄 License
+
+MIT
