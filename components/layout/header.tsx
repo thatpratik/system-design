@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, Network } from "lucide-react";
+import { Menu, Network, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -13,6 +13,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { useSearchStore } from "@/lib/search-store";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -23,6 +24,7 @@ const navLinks = [
 export function Header() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const openSearch = useSearchStore((s) => s.setOpen);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -50,8 +52,37 @@ export function Header() {
           ))}
         </nav>
 
+        {/* Search trigger */}
+        <div className="ml-auto flex items-center gap-2">
+          {/* Desktop: full search bar */}
+          <button
+            onClick={() => openSearch(true)}
+            className="hidden md:flex items-center gap-2 h-8 rounded-md border border-border/70 bg-muted/30 px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground hover:border-border transition-all group"
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" />
+            <span className="text-xs">Search…</span>
+            <span className="ml-3 flex items-center gap-0.5">
+              <kbd className="rounded border border-border/70 bg-background px-1 py-0.5 text-[9px] font-mono shadow-[0_1px_0_hsl(var(--border))] group-hover:border-border transition-colors">
+                ⌘
+              </kbd>
+              <kbd className="rounded border border-border/70 bg-background px-1 py-0.5 text-[9px] font-mono shadow-[0_1px_0_hsl(var(--border))] group-hover:border-border transition-colors">
+                K
+              </kbd>
+            </span>
+          </button>
+
+          {/* Mobile: icon only */}
+          <button
+            onClick={() => openSearch(true)}
+            className="md:hidden flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Search className="h-4 w-4" />
+            <span className="sr-only">Search</span>
+          </button>
+        </div>
+
         {/* Mobile hamburger */}
-        <div className="ml-auto md:hidden">
+        <div className="md:hidden">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">
