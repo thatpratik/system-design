@@ -21,9 +21,9 @@ export default function SystemsPage() {
 
   return (
     <div className="container py-10">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Systems</h1>
-        <p className="text-muted-foreground">
+      <div className="mb-10">
+        <h1 className="font-display text-4xl sm:text-5xl tracking-tight mb-3">Systems</h1>
+        <p className="text-muted-foreground max-w-xl">
           End-to-end architectures of real-world systems, broken down into reusable components.
         </p>
       </div>

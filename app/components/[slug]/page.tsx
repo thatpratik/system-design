@@ -62,8 +62,8 @@ export default async function ComponentPage({ params }: Props) {
         <div className="flex items-center gap-3 mb-3">
           <CategoryBadge category={meta.category} />
         </div>
-        <h1 className="text-3xl font-bold tracking-tight mb-3">{meta.title}</h1>
-        <p className="text-muted-foreground text-lg leading-relaxed">{meta.summary}</p>
+        <h1 className="font-display text-4xl sm:text-5xl tracking-tight mb-3">{meta.title}</h1>
+        <p className="text-muted-foreground text-lg leading-relaxed max-w-2xl">{meta.summary}</p>
       </div>
 
       <Separator className="mb-8" />

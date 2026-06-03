@@ -21,9 +21,9 @@ export default function ComponentsPage() {
 
   return (
     <div className="container py-10">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Components</h1>
-        <p className="text-muted-foreground">
+      <div className="mb-10">
+        <h1 className="font-display text-4xl sm:text-5xl tracking-tight mb-3">Components</h1>
+        <p className="text-muted-foreground max-w-xl">
           Individual building blocks of distributed systems — how they work, their trade-offs, and where they are used.
         </p>
       </div>

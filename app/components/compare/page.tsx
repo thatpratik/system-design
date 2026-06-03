@@ -40,7 +40,7 @@ export default async function ComparePage({ searchParams }: Props) {
         </Link>
         <div className="flex items-center gap-3 mb-2">
           <ArrowLeftRight className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold">Compare Components</h1>
+          <h1 className="font-display text-3xl tracking-tight">Compare Components</h1>
         </div>
         <p className="text-muted-foreground mb-8">
           Select two components to compare them side by side.
@@ -75,7 +75,7 @@ export default async function ComparePage({ searchParams }: Props) {
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <ArrowLeftRight className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold">
+          <h1 className="font-display text-3xl tracking-tight">
             {metaA.title} vs {metaB.title}
           </h1>
         </div>
