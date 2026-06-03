@@ -29,6 +29,8 @@ Databases are slow relative to memory. Repeated reads of the same data waste I/O
 
 **Hit rate** is the primary health metric: `hits / (hits + misses)`. A healthy cache hit rate is typically above 90%.
 
+<CacheDiagram />
+
 ## Eviction Policies
 
 When the cache is full, old entries must be removed:

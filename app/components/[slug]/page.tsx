@@ -6,6 +6,13 @@ import { getComponent, getAllComponents, getSystemsBySlug, getComponentsBySlug }
 import { MdxContent } from "@/components/shared/mdx-content";
 import { CategoryBadge } from "@/components/shared/category-badge";
 import { Separator } from "@/components/ui/separator";
+import { LoadBalancerDiagram } from "@/components/visualizations/load-balancer-diagram";
+import { CacheDiagram } from "@/components/visualizations/cache-diagram";
+
+const componentVisualizations: Record<string, Record<string, React.ComponentType>> = {
+  "load-balancer": { LoadBalancerDiagram },
+  "caching": { CacheDiagram },
+};
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -62,7 +69,7 @@ export default async function ComponentPage({ params }: Props) {
       <Separator className="mb-8" />
 
       {/* MDX body */}
-      <MdxContent source={content} />
+      <MdxContent source={content} components={componentVisualizations[slug]} />
 
       {/* Related sections */}
       {(usedInSystems.length > 0 || alternatives.length > 0 || meta.externalLinks?.length > 0) && (
