@@ -1,3 +1,5 @@
+<div align="center">
+
 # System Design
 
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)](https://nextjs.org)
@@ -6,26 +8,56 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v3-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)](https://react.dev)
 
-An interactive learning platform for exploring system design patterns — browse full system architectures, drill into individual building blocks, compare alternatives, and visualise relationships across a knowledge graph.
+*A knowledge-graph-powered platform for learning distributed system design.*
+*Browse architectures, drill into building blocks, compare alternatives — all cross-linked and searchable.*
+
+</div>
+
+---
+
+## Contents
+
+- [🚀 Quick Start](#-quick-start)
+- [✨ Features](#-features)
+- [🗺️ Architecture](#️-architecture)
+- [📦 Tech Stack](#-tech-stack)
+- [🧩 Content Model](#-content-model)
+- [🕸️ Knowledge Graph](#️-knowledge-graph)
+- [🧭 User Flows](#-user-flows)
+- [🗂️ Project Structure](#️-project-structure)
+- [➕ Adding Content](#-adding-content)
+- [📄 License](#-license)
+
+---
+
+## 🚀 Quick Start
+
+```bash
+bun install        # install dependencies
+bun dev            # dev server at http://localhost:3000 (Turbopack)
+bun build          # production build
+bun start          # serve production build
+bun lint           # ESLint via next lint
+```
 
 ---
 
 ## ✨ Features
 
-| | Feature | Description |
-|---|---|---|
-| 📖 | **System Deep-Dives** | Full MDX articles with interactive React Flow architecture diagrams |
-| 🧩 | **Component Library** | Reusable building blocks with strengths, weaknesses, and best-fit guidance |
-| ⚖️ | **Side-by-Side Compare** | Pick any two components and compare them across four structured dimensions |
-| 🔍 | **Cmd+K Search** | Fuzzy full-text search across all systems and components via Fuse.js |
-| 🕸️ | **Knowledge Graph** | D3 force-directed graph visualising every system↔component relationship |
-| 🔗 | **Bidirectional Links** | Systems list their components; components list the systems that use them |
+| Feature | Description |
+|---|---|
+| 📖 **System Deep-Dives** | Full MDX articles with interactive React Flow architecture diagrams |
+| 🧩 **Component Library** | Reusable building blocks with strengths, weaknesses, and best-fit guidance |
+| ⚖️ **Side-by-Side Compare** | Pick any two components and compare them across four structured dimensions |
+| 🔍 **Cmd+K Search** | Fuzzy full-text search across all systems and components via Fuse.js |
+| 🕸️ **Knowledge Graph** | D3 force-directed graph visualising every system↔component relationship |
+| 🔗 **Bidirectional Links** | Systems list their components; components list the systems that use them |
 
 ---
 
 ## 🗺️ Architecture
 
-All content lives in MDX files — no database, no CMS. Everything is read from the filesystem at build time and fed into a typed content pipeline.
+> **Note:** All content is read from MDX files at build time — there is no database or CMS.
 
 ```mermaid
 flowchart TD
@@ -61,33 +93,25 @@ flowchart TD
 
 | Layer | Technology |
 |---|---|
+| **Framework & Language** | |
 | Framework | Next.js 15 (App Router) |
 | Language | TypeScript 5 |
 | Package manager | Bun |
+| **Styling & UI** | |
 | Styling | Tailwind CSS v3 + `@tailwindcss/typography` |
 | UI components | shadcn/ui (Radix UI primitives) |
 | Icons | Lucide React |
 | Fonts | Geist Sans + Geist Mono |
-| Content | MDX via `next-mdx-remote/rsc` |
+| **Content Pipeline** | |
+| Content format | MDX via `next-mdx-remote/rsc` |
 | Syntax highlighting | `rehype-pretty-code` + Shiki |
 | Markdown extras | `remark-gfm` |
 | Frontmatter parsing | `gray-matter` |
+| **Data, Search & Visualization** | |
 | Search | Fuse.js (client-side fuzzy search) |
 | Search state | Zustand |
 | Interactive diagrams | React Flow (`@xyflow/react`) |
 | Knowledge graph | D3.js v7 (force-directed) |
-
----
-
-## 🚀 Quick Start
-
-```bash
-bun install        # install dependencies
-bun dev            # dev server at http://localhost:3000 (Turbopack)
-bun build          # production build
-bun start          # serve production build
-bun lint           # ESLint via next lint
-```
 
 ---
 
@@ -128,7 +152,8 @@ erDiagram
     COMPONENT }o--o{ COMPONENT : "compared via alternatives[]"
 ```
 
-### System frontmatter
+<details>
+<summary><strong>System frontmatter</strong></summary>
 
 ```yaml
 title: "URL Shortener"
@@ -143,7 +168,10 @@ externalLinks:
     url: "https://..."
 ```
 
-### Component frontmatter
+</details>
+
+<details>
+<summary><strong>Component frontmatter</strong></summary>
 
 ```yaml
 title: "Caching"
@@ -167,11 +195,13 @@ externalLinks:
     url: "https://..."
 ```
 
+</details>
+
 ---
 
 ## 🕸️ Knowledge Graph
 
-Every system and component becomes a node. Edges flow from system → component, forming a navigable web of relationships visible at `/graph`.
+Every system and component becomes a node. Edges flow from system → component, forming a navigable web of relationships visible at `/graph`. The live graph supports drag-to-reposition, scroll/pinch to zoom, and click-to-navigate.
 
 ```mermaid
 graph LR
@@ -198,8 +228,6 @@ graph LR
     class url_shortener system
     class load_balancer,caching,cdn,api_gateway component
 ```
-
-The live graph supports drag-to-reposition, scroll/pinch to zoom, and click-to-navigate.
 
 ---
 
@@ -288,26 +316,30 @@ types/
 
 ## ➕ Adding Content
 
-### New system
+Categories: `storage` · `messaging` · `compute` · `networking` · `coordination` · `observability`
+
+<details>
+<summary><strong>Add a new system</strong></summary>
 
 1. Create `content/systems/<slug>/index.mdx` with the System frontmatter above.
 2. List the component slugs it uses under `components:`.
 3. Add the system's slug to `usedIn:` in each referenced component's frontmatter.
 4. The system appears automatically on `/systems`, `/systems/[slug]`, search, and the knowledge graph.
 
-### New component
+</details>
+
+<details>
+<summary><strong>Add a new component</strong></summary>
 
 1. Create `content/components/<slug>/index.mdx` with the Component frontmatter above.
 2. Add the component's slug to `components:` in any system that uses it.
 3. Optionally create a React Flow diagram in `components/visualizations/` and register it in `app/components/[slug]/page.tsx`.
 4. The component appears automatically on `/components`, `/components/[slug]`, search, compare, and the graph.
 
-### Categories
-
-`storage` · `messaging` · `compute` · `networking` · `coordination` · `observability`
+</details>
 
 ---
 
 ## 📄 License
 
-MIT
+MIT — see [LICENSE](LICENSE)
