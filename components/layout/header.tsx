@@ -19,6 +19,7 @@ const navLinks = [
   { href: "/", label: "Home" },
   { href: "/systems", label: "Systems" },
   { href: "/components", label: "Components" },
+  { href: "/graph", label: "Graph" },
 ];
 
 export function Header() {

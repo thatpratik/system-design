@@ -74,6 +74,57 @@ export function getSystemsBySlug(slugs: string[]): SystemMeta[] {
   });
 }
 
+// ── Graph data ────────────────────────────────────────────────────────────────
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  type: "system" | "component";
+  category: string;
+  slug: string;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export function buildGraphData(): GraphData {
+  const systems = getAllSystems();
+  const components = getAllComponents();
+
+  const nodes: GraphNode[] = [
+    ...systems.map((s) => ({
+      id: `system:${s.slug}`,
+      label: s.title,
+      type: "system" as const,
+      category: s.category,
+      slug: s.slug,
+    })),
+    ...components.map((c) => ({
+      id: `component:${c.slug}`,
+      label: c.title,
+      type: "component" as const,
+      category: c.category,
+      slug: c.slug,
+    })),
+  ];
+
+  const edges: GraphEdge[] = systems.flatMap((s) =>
+    (s.components ?? []).map((componentSlug) => ({
+      source: `system:${s.slug}`,
+      target: `component:${componentSlug}`,
+    }))
+  );
+
+  return { nodes, edges };
+}
+
 // ── Search index ──────────────────────────────────────────────────────────────
 
 export interface SearchEntry {
