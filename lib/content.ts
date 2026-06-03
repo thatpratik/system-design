@@ -52,6 +52,28 @@ export function getSystem(slug: string): ContentItem<SystemMeta> {
   return { meta: data as unknown as SystemMeta, content };
 }
 
+// ── Batch lookups (safe — skips missing slugs) ────────────────────────────────
+
+export function getComponentsBySlug(slugs: string[]): ComponentMeta[] {
+  return slugs.flatMap((slug) => {
+    try {
+      return [getComponentMeta(slug)];
+    } catch {
+      return [];
+    }
+  });
+}
+
+export function getSystemsBySlug(slugs: string[]): SystemMeta[] {
+  return slugs.flatMap((slug) => {
+    try {
+      return [getSystemMeta(slug)];
+    } catch {
+      return [];
+    }
+  });
+}
+
 // ── Search index ──────────────────────────────────────────────────────────────
 
 export interface SearchEntry {

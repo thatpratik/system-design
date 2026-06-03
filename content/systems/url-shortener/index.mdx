@@ -31,12 +31,12 @@ A URL shortener maps a long URL to a short alias (e.g. `short.ly/abc123`). When 
 
 ## High-Level Architecture
 
-```
-Client → Load Balancer → App Servers → Cache → Database
-```
+<UrlShortenerDiagram />
 
-1. **Write path**: Client submits long URL → App server generates short key → Store mapping in DB → Return short URL
-2. **Read path**: Client visits short URL → App server looks up cache → On miss, looks up DB → Issue HTTP redirect
+1. **Write path**: Client submits long URL → App server generates short key → stores mapping in DB → returns short URL
+2. **Read path**: Client visits short URL → App server checks cache first → on miss falls back to DB → issues HTTP redirect
+
+Toggle between **Read Path** and **Write Path** in the diagram above to highlight each flow.
 
 ## Key Design Decisions
 
