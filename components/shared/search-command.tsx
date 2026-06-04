@@ -53,10 +53,6 @@ export function SearchCommand({ entries }: SearchCommandProps) {
   const components = useMemo(() => results.filter((r) => r.type === "component"), [results]);
   const flat = useMemo(() => [...systems, ...components], [systems, components]);
 
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
-
   // Global Cmd+K / Ctrl+K shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -73,8 +69,6 @@ export function SearchCommand({ entries }: SearchCommandProps) {
   useEffect(() => {
     if (open) {
       const id = setTimeout(() => inputRef.current?.focus(), 30);
-      setQuery("");
-      setActiveIndex(0);
       return () => clearTimeout(id);
     }
   }, [open]);
@@ -117,7 +111,7 @@ export function SearchCommand({ entries }: SearchCommandProps) {
   }, [activeIndex]);
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root open={open} onOpenChange={(next) => { if (next) { setQuery(""); setActiveIndex(0); } setOpen(next); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content
@@ -133,7 +127,7 @@ export function SearchCommand({ entries }: SearchCommandProps) {
             <input
               ref={inputRef}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); setActiveIndex(0); }}
               placeholder="Search systems and components…"
               spellCheck={false}
               autoComplete="off"

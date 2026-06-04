@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 bun dev          # dev server at localhost:3000 (Turbopack)
 bun build        # production build
 bun start        # serve production build
-bun lint         # ESLint via next lint
+bun lint         # ESLint (0 warnings allowed)
+bun lint:fix     # ESLint with auto-fix
 ```
 
 ## Architecture
