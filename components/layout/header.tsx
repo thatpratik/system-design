@@ -17,8 +17,8 @@ import { useSearchStore } from "@/lib/search-store";
 
 const navLinks = [
   { href: "/", label: "Home" },
-  { href: "/systems", label: "Systems" },
   { href: "/components", label: "Components" },
+  { href: "/systems", label: "Systems" },
   { href: "/graph", label: "Graph" },
 ];
 
