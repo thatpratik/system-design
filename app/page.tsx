@@ -187,6 +187,16 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Clear Responsibilities ───────────────────────────────── */}
+      <section className="animate-fade-in-up" style={{ animationDelay: "400ms" }}>
+        <h2 className="font-display text-2xl sm:text-3xl tracking-tight mb-4 text-foreground">
+          Each component owns exactly one thing
+        </h2>
+        <p className="text-muted-foreground text-base leading-relaxed">
+          Every component you break out should have a clear, singular responsibility — and it should be mutually exclusive from every other component. No two components should share the same job. If they do, that&apos;s a signal to redraw the boundary or collapse them into one.
+        </p>
+      </section>
+
     </div>
   );
 }
