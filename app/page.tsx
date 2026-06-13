@@ -1,6 +1,6 @@
 export default function Home() {
   return (
-    <div className="container max-w-4xl py-16 space-y-16">
+    <div className="container py-16 space-y-16">
 
       {/* ── What is System Design? ──────────────────────────────── */}
       <section className="animate-fade-in-up">
@@ -8,10 +8,10 @@ export default function Home() {
           What is System Design?
         </h1>
         <p className="text-muted-foreground text-base leading-relaxed mb-4">
-          System design is the process of defining the architecture, components, modules, and data flow of a system to satisfy a set of requirements. It&apos;s not about finding a single correct answer — it&apos;s about reasoning through trade-offs, constraints, and scalability concerns to arrive at a defensible architecture.
+          System design is how you figure out what to build before you build it. Not a single right answer — a way of thinking through trade-offs until you land on something you can defend.
         </p>
         <p className="text-muted-foreground text-base leading-relaxed">
-          Whether you&apos;re designing a URL shortener or a global social network, the same structured thinking applies: break the problem into parts, understand each part deeply, and then reason about how they connect.
+          Whether it&apos;s a URL shortener or a global social network, the same approach works: break it down, understand each piece, and reason about how they fit together.
         </p>
       </section>
 
@@ -30,7 +30,7 @@ export default function Home() {
               <div>
                 <h3 className="font-semibold text-foreground mb-2">Don&apos;t jump to a solution</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">
-                  The instinct in system design is to immediately reach for a specific technology or pattern. Resist it. Before writing any box on a diagram, understand what you&apos;re actually trying to build. Clarify requirements, identify scale expectations, and establish constraints. A well-framed problem is halfway solved.
+                  Before you draw a single box, understand what you&apos;re actually building. Clarify requirements, figure out the scale, know the constraints. The instinct to reach straight for a technology is almost always wrong.
                 </p>
               </div>
             </div>
@@ -41,9 +41,9 @@ export default function Home() {
             <div className="flex items-start gap-4">
               <span className="text-indigo-400 font-mono font-bold text-lg leading-none mt-0.5">02</span>
               <div>
-                <h3 className="font-semibold text-foreground mb-2">Draw boundaries and expand outward</h3>
+                <h3 className="font-semibold text-foreground mb-2">Keep drawing boundaries, start small and expand</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">
-                  Start small — sketch the core boundary of the system. Then expand in every direction simultaneously: database, frontend, backend, load balancer, cache. Don&apos;t tunnel down one path early. Think of it like inflating a balloon — you want even pressure on all sides before you commit to the shape of any one part.
+                  Start from the center and grow outward in every direction — database, frontend, backend, server, load balancer. Don&apos;t go deep on one thing first. Expand evenly before you commit to the shape of any part.
                 </p>
               </div>
             </div>
@@ -56,7 +56,7 @@ export default function Home() {
               <div>
                 <h3 className="font-semibold text-foreground mb-2">Split into subcomponents and features</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">
-                  Decompose the system into discrete, independently reasoned pieces. A large system like Facebook isn&apos;t one design — it&apos;s dozens of smaller ones. Identify the major features first, then treat each as a standalone design problem.
+                  A big system isn&apos;t one design — it&apos;s many smaller ones. Break it into its major features first. Then treat each feature as its own design problem.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {["Authentication", "Feed", "Notifications", "Messaging", "Search"].map((f) => (
@@ -74,9 +74,9 @@ export default function Home() {
             <div className="flex items-start gap-4">
               <span className="text-indigo-400 font-mono font-bold text-lg leading-none mt-0.5">04</span>
               <div>
-                <h3 className="font-semibold text-foreground mb-2">Dissect each component deeply</h3>
+                <h3 className="font-semibold text-foreground mb-2">Dissect each component — keep going deeper</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">
-                  Once you have features, dig into each one. Take the Feed as an example — it&apos;s not just a database lookup. It requires a web server with load balancing, a database layer, an aggregator to collect posts from followed accounts, and a generator to pre-compute feeds. Each of these might need its own sub-design.
+                  Take Feed. It&apos;s not just a database lookup — it needs a web server, a load balancer, a database, an aggregator to collect posts, and a generator to pre-compute results. Each of those might need its own breakdown too.
                 </p>
               </div>
             </div>
@@ -88,10 +88,10 @@ export default function Home() {
       {/* ── The Four Pillars ────────────────────────────────────── */}
       <section className="animate-fade-in-up" style={{ animationDelay: "160ms" }}>
         <h2 className="font-display text-2xl sm:text-3xl tracking-tight mb-2 text-foreground">
-          The Four Pillars
+          For Each Subcomponent, Ask Four Things
         </h2>
         <p className="text-muted-foreground text-sm leading-relaxed mb-6">
-          For every subcomponent you design, evaluate it through these four lenses.
+          Every piece of a system should be evaluated through these lenses.
         </p>
 
         <div className="grid sm:grid-cols-2 gap-4">
@@ -101,7 +101,7 @@ export default function Home() {
               <span className="text-emerald-500">◈</span> Storage &amp; Caching
             </h3>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              How and where is data stored? What access patterns does it serve? Which parts benefit from a cache layer? Think about consistency requirements — can reads be slightly stale, or must they be fresh?
+              How and where is the data being stored? What access pattern does it serve? Can reads tolerate being slightly stale, or do they need to be fresh?
             </p>
           </div>
 
@@ -110,7 +110,7 @@ export default function Home() {
               <span className="text-emerald-500">◈</span> Scaling &amp; Fault Tolerance
             </h3>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              How does this component scale from 1 to 1 million users? What happens when a node crashes? Load balancers, replication, and horizontal scaling are your tools here. Design for failure as a default.
+              How does it scale from 1 to 1 million users? What happens when a node crashes? Design for failure by default — load balancers, replication, horizontal scaling.
             </p>
           </div>
 
@@ -119,7 +119,7 @@ export default function Home() {
               <span className="text-emerald-500">◈</span> Async Processing
             </h3>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              What work can be deferred or delegated? Pre-generating a user&apos;s feed before they open the app, or offloading email delivery to a background queue — async processing is how you keep hot paths fast.
+              What work can be delegated or deferred to another process? Pre-generating a feed before the user opens the app, offloading email to a background queue — this is how you keep the hot path fast.
             </p>
           </div>
 
@@ -128,7 +128,7 @@ export default function Home() {
               <span className="text-emerald-500">◈</span> Communication
             </h3>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              How do components talk to each other? REST and HTTP for external APIs, gRPC for internal service-to-service calls, TCP for low-latency streams, or event queues for decoupled producers and consumers.
+              How do components talk to each other? HTTP/REST for external APIs, gRPC for internal calls, TCP for low-latency, event queues for decoupled producers and consumers.
             </p>
           </div>
 
@@ -138,17 +138,17 @@ export default function Home() {
       {/* ── Worked Example ──────────────────────────────────────── */}
       <section className="animate-fade-in-up" style={{ animationDelay: "240ms" }}>
         <h2 className="font-display text-2xl sm:text-3xl tracking-tight mb-2 text-foreground">
-          Worked Example: Design Facebook
+          Example: Design Facebook
         </h2>
         <p className="text-muted-foreground text-sm leading-relaxed mb-6">
-          Let&apos;s walk through the decomposition strategy in practice.
+          Here&apos;s what the decomposition looks like in practice.
         </p>
 
         <div className="space-y-3">
 
           {/* Level 1 */}
           <div className="bg-card border rounded-lg p-5">
-            <h3 className="font-semibold text-foreground text-sm mb-3 uppercase tracking-wide text-muted-foreground">Step 1 — Identify features</h3>
+            <h3 className="font-semibold text-foreground text-sm mb-3 uppercase tracking-wide text-muted-foreground">Step 1 — What are the features?</h3>
             <div className="flex flex-wrap gap-2">
               {["Authentication", "News Feed", "Notifications", "Messaging", "Search", "Profile"].map((f) => (
                 <span key={f} className="text-xs bg-muted text-foreground border rounded px-2 py-1 font-mono">
@@ -160,14 +160,14 @@ export default function Home() {
 
           {/* Level 2 */}
           <div className="bg-card border rounded-lg p-5">
-            <h3 className="font-semibold text-foreground text-sm mb-3 uppercase tracking-wide text-muted-foreground">Step 2 — Dissect one feature: News Feed</h3>
+            <h3 className="font-semibold text-foreground text-sm mb-3 uppercase tracking-wide text-muted-foreground">Step 2 — Dissect one: News Feed</h3>
             <div className="grid sm:grid-cols-2 gap-3">
               {[
-                { name: "Web Server", note: "Serves feed requests; sits behind a load balancer" },
-                { name: "Load Balancer", note: "Distributes traffic; needs health checks and routing logic" },
-                { name: "Database", note: "Stores posts, reactions, and user graph edges" },
-                { name: "Aggregator", note: "Collects posts from all accounts a user follows" },
-                { name: "Feed Generator", note: "Pre-computes ranked feeds and stores them for fast retrieval" },
+                { name: "Web Server", note: "Serves feed requests, sits behind a load balancer" },
+                { name: "Load Balancer", note: "Distributes traffic, needs health checks and routing logic" },
+                { name: "Database", note: "Stores posts, reactions, and the user graph" },
+                { name: "Aggregator", note: "Collects posts from everyone a user follows" },
+                { name: "Feed Generator", note: "Pre-computes ranked feeds and stores them for fast reads" },
               ].map((c) => (
                 <div key={c.name} className="bg-muted/50 rounded p-3">
                   <p className="font-mono text-xs font-semibold text-foreground mb-1">{c.name}</p>
@@ -181,7 +181,7 @@ export default function Home() {
           <div className="bg-card border rounded-lg p-5">
             <h3 className="font-semibold text-foreground text-sm mb-3 uppercase tracking-wide text-muted-foreground">Step 3 — Go deeper: Feed Generator</h3>
             <p className="text-muted-foreground text-sm leading-relaxed mb-3">
-              The generator itself decomposes further. It needs to pull the user&apos;s follower list, fetch recent posts from each followed account, rank and merge them, then write the result to a fast-access store like Redis.
+              The generator itself breaks down further — it needs to pull the follower list, fetch recent posts from each, rank and merge them, then write to something fast like Redis.
             </p>
             <div className="flex flex-wrap gap-2">
               {["Post Service", "Followers Service", "Ranker / Merger", "Feed Cache (Redis)"].map((c) => (
@@ -203,15 +203,15 @@ export default function Home() {
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="bg-card border rounded-lg p-5 border-t-2 border-t-indigo-400">
-            <h3 className="font-semibold text-foreground mb-2">Big problem → Top-down</h3>
+            <h3 className="font-semibold text-foreground mb-2">Big problem → top-down</h3>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              If you&apos;ve been handed a broad, open-ended problem (&quot;Design Twitter&quot;), start by defining features at the top level. Then work downward — one feature at a time, fully designed before moving to the next.
+              Given something open-ended like &quot;Design Twitter&quot; — start by listing features at the top level, then design them one by one, top to bottom.
             </p>
           </div>
           <div className="bg-card border rounded-lg p-5 border-t-2 border-t-emerald-400">
-            <h3 className="font-semibold text-foreground mb-2">Specific problem → Bottom-up</h3>
+            <h3 className="font-semibold text-foreground mb-2">Specific problem → bottom-up</h3>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              If you&apos;ve been dropped into a specific component (&quot;Design the feed generation pipeline&quot;), start at the lowest level and build upward — understand the atomic pieces before composing them into a larger system.
+              Dropped into something specific like &quot;Design the feed generation pipeline&quot; — start at the lowest level pieces and build upward, like the feed generator example above.
             </p>
           </div>
         </div>
