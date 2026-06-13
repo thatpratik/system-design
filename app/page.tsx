@@ -1,3 +1,5 @@
+import { FacebookFeedGraph } from "@/components/visualizations/facebook-feed-graph";
+
 export default function Home() {
   return (
     <div className="container py-16 space-y-16">
@@ -144,55 +146,23 @@ export default function Home() {
           Here&apos;s what the decomposition looks like in practice.
         </p>
 
-        <div className="space-y-3">
-
-          {/* Level 1 */}
-          <div className="bg-card border rounded-lg p-5">
-            <h3 className="font-semibold text-foreground text-sm mb-3 uppercase tracking-wide text-muted-foreground">Step 1 — What are the features?</h3>
-            <div className="flex flex-wrap gap-2">
-              {["Authentication", "News Feed", "Notifications", "Messaging", "Search", "Profile"].map((f) => (
-                <span key={f} className="text-xs bg-muted text-foreground border rounded px-2 py-1 font-mono">
-                  {f}
-                </span>
-              ))}
-            </div>
+        {/* Step 1: features */}
+        <div className="bg-card border rounded-lg p-5 mb-3">
+          <h3 className="font-semibold text-foreground text-sm mb-3 uppercase tracking-wide text-muted-foreground">Step 1 — What are the features?</h3>
+          <div className="flex flex-wrap gap-2">
+            {["Authentication", "News Feed", "Notifications", "Messaging", "Search", "Profile"].map((f) => (
+              <span key={f} className="text-xs bg-muted text-foreground border rounded px-2 py-1 font-mono">
+                {f}
+              </span>
+            ))}
           </div>
-
-          {/* Level 2 */}
-          <div className="bg-card border rounded-lg p-5">
-            <h3 className="font-semibold text-foreground text-sm mb-3 uppercase tracking-wide text-muted-foreground">Step 2 — Dissect one: News Feed</h3>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {[
-                { name: "Web Server", note: "Serves feed requests, sits behind a load balancer" },
-                { name: "Load Balancer", note: "Distributes traffic, needs health checks and routing logic" },
-                { name: "Database", note: "Stores posts, reactions, and the user graph" },
-                { name: "Aggregator", note: "Collects posts from everyone a user follows" },
-                { name: "Feed Generator", note: "Pre-computes ranked feeds and stores them for fast reads" },
-              ].map((c) => (
-                <div key={c.name} className="bg-muted/50 rounded p-3">
-                  <p className="font-mono text-xs font-semibold text-foreground mb-1">{c.name}</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{c.note}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Level 3 */}
-          <div className="bg-card border rounded-lg p-5">
-            <h3 className="font-semibold text-foreground text-sm mb-3 uppercase tracking-wide text-muted-foreground">Step 3 — Go deeper: Feed Generator</h3>
-            <p className="text-muted-foreground text-sm leading-relaxed mb-3">
-              The generator itself breaks down further — it needs to pull the follower list, fetch recent posts from each, rank and merge them, then write to something fast like Redis.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {["Post Service", "Followers Service", "Ranker / Merger", "Feed Cache (Redis)"].map((c) => (
-                <span key={c} className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded px-2 py-1 font-mono dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800">
-                  {c}
-                </span>
-              ))}
-            </div>
-          </div>
-
         </div>
+
+        {/* Steps 2 & 3: graph */}
+        <p className="text-muted-foreground text-sm leading-relaxed mb-3">
+          Then dissect one feature — News Feed — and keep going deeper. The Feed Generator itself breaks into Post Service, Followers Service, a Ranker/Merger, and a cache layer.
+        </p>
+        <FacebookFeedGraph />
       </section>
 
       {/* ── Remember ────────────────────────────────────────────── */}
