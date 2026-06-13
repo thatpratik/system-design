@@ -1,6 +1,6 @@
 export default function Home() {
   return (
-    <div className="container max-w-3xl py-16 space-y-16">
+    <div className="container max-w-4xl py-16 space-y-16">
 
       {/* ── What is System Design? ──────────────────────────────── */}
       <section className="animate-fade-in-up">
