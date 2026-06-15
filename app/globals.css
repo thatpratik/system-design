@@ -59,6 +59,43 @@
   }
 }
 
+@layer base {
+  /* Code block container — rehype-pretty-code wraps in <figure> */
+  [data-rehype-pretty-code-figure] {
+    @apply my-6;
+  }
+
+  [data-rehype-pretty-code-figure] pre {
+    @apply rounded-lg border border-border overflow-x-auto px-5 py-4 text-sm leading-relaxed;
+  }
+
+  /* Title bar above code blocks (```sql title="..." ) */
+  [data-rehype-pretty-code-title] {
+    @apply rounded-t-lg border border-b-0 border-border bg-muted px-4 py-2 text-xs font-medium text-muted-foreground -mb-[1px];
+  }
+
+  /* Highlighted lines */
+  [data-highlighted-line] {
+    @apply bg-white/10 -mx-5 px-5;
+  }
+
+  /* Prose resets — prevent inline-code styles from bleeding into pre blocks */
+  .prose pre {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+
+  .prose pre code {
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    color: inherit !important;
+  }
+}
+
 @layer utilities {
   .animate-fade-in-up {
     animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
