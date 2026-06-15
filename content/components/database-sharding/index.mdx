@@ -1,8 +1,8 @@
 ---
-title: "Database Sharding"
+title: "Sharding & Partitioning"
 slug: "database-sharding"
 category: "storage"
-summary: "Horizontal partitioning that splits a dataset across multiple independent database instances, each owning a disjoint subset of the data — the primary strategy for scaling writes beyond what a single machine can handle."
+summary: "Two complementary strategies for splitting large datasets: partitioning divides data within a single database instance; sharding distributes it across independent instances to scale writes horizontally."
 usedIn: []
 alternatives:
   - "rdbms"
@@ -12,30 +12,144 @@ externalLinks:
     url: "https://vitess.io/docs/"
   - label: "Citus — Postgres Sharding"
     url: "https://docs.citusdata.com/"
+  - label: "PostgreSQL Table Partitioning"
+    url: "https://www.postgresql.org/docs/current/ddl-partitioning.html"
   - label: "MongoDB Sharding"
     url: "https://www.mongodb.com/docs/manual/sharding/"
 strengths:
-  - "Write throughput scales horizontally — add shards to absorb more load"
-  - "Each shard holds less data, so indexes stay smaller and queries stay fast"
-  - "Fault blast radius is limited — a shard failure affects only its partition of data"
-  - "Storage scales linearly with the number of shards"
+  - "Partitioning improves query performance and maintenance on large tables within a single DB"
+  - "Sharding scales write throughput linearly — add instances to absorb more load"
+  - "Each shard's fault blast radius is limited to its own data partition"
+  - "Partition pruning eliminates full-table scans for range and list queries"
 weaknesses:
   - "Cross-shard JOINs and transactions are expensive or impossible"
-  - "Re-sharding (rebalancing) when shards fill up is operationally complex"
+  - "Re-sharding when instances fill up is operationally complex"
   - "Application or middleware must know which shard to target for every query"
-  - "Hot shards (uneven data distribution) can negate all the scaling benefits"
+  - "Hot shards from skewed key distribution can negate all scaling benefits"
 bestFor:
   - "Write-heavy workloads that have outgrown a single primary and its replicas"
+  - "Large tables with clear time or key ranges (partition) before committing to full sharding"
   - "Multi-tenant SaaS where each tenant's data is naturally isolated"
-  - "Time-series data where recent shards absorb all writes and old shards are cold"
-  - "Social graphs or user data partitioned by user ID range or hash"
+  - "Time-series data where recent partitions absorb all writes"
 notFor:
   - "Read-heavy workloads — read replicas and caching are simpler and cheaper"
-  - "Data with complex cross-entity relationships that require frequent JOINs"
+  - "Data with complex cross-entity relationships requiring frequent JOINs"
   - "Small-to-medium datasets — the operational overhead is not worth it"
 ---
 
-## What is Database Sharding?
+## Partitioning vs Sharding
+
+These terms are often used interchangeably but describe different levels of data splitting.
+
+```
+Partitioning                          Sharding
+────────────                          ────────
+One database instance                 Multiple independent instances
+One connection string                 Routing layer required
+Transparent to the application        Application must know about shards
+Better query performance + ops        Horizontal write scale
+```
+
+**Partitioning** divides a large table into smaller physical segments (partitions) that live inside the same database instance. The database engine handles routing automatically — the application queries the table name, not the partition.
+
+**Sharding** distributes data across entirely separate database instances. Each instance (shard) is operationally independent. The application (or a proxy layer) must route every query to the correct shard.
+
+Start with partitioning. It gives most of the performance benefits with none of the operational complexity of sharding.
+
+---
+
+## Partitioning
+
+### How It Works
+
+The database splits a logical table into physical partitions based on a partition key. The query planner uses **partition pruning** to skip irrelevant partitions when a query includes the partition key.
+
+```sql
+-- PostgreSQL: partition orders by year
+CREATE TABLE orders (
+  id         BIGSERIAL,
+  user_id    BIGINT        NOT NULL,
+  total      NUMERIC       NOT NULL,
+  created_at TIMESTAMPTZ   NOT NULL
+) PARTITION BY RANGE (created_at);
+
+CREATE TABLE orders_2023 PARTITION OF orders
+  FOR VALUES FROM ('2023-01-01') TO ('2024-01-01');
+
+CREATE TABLE orders_2024 PARTITION OF orders
+  FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
+
+CREATE TABLE orders_2025 PARTITION OF orders
+  FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');
+
+-- This query only scans orders_2025 — partition pruning
+SELECT * FROM orders
+WHERE created_at >= '2025-01-01'
+  AND user_id = 8821;
+```
+
+### Partition Types
+
+**Range partitioning** — rows assigned based on a value range. Most common for timestamps and sequential IDs.
+
+```sql
+-- By date range: archival queries, time-series workloads
+PARTITION BY RANGE (created_at)
+
+-- By ID range: even distribution when IDs are sequential
+PARTITION BY RANGE (id)
+```
+
+**List partitioning** — rows assigned by exact value membership. Good for a known set of categories.
+
+```sql
+-- By region: queries scoped to one region touch one partition
+CREATE TABLE events PARTITION BY LIST (region);
+
+CREATE TABLE events_us   PARTITION OF events FOR VALUES IN ('us-east', 'us-west');
+CREATE TABLE events_eu   PARTITION OF events FOR VALUES IN ('eu-west', 'eu-central');
+CREATE TABLE events_apac PARTITION OF events FOR VALUES IN ('ap-south', 'ap-east');
+```
+
+**Hash partitioning** — rows assigned by `hash(key) % N`. Distributes rows evenly when there is no natural range or list.
+
+```sql
+-- 8 partitions, data distributed evenly by user_id
+CREATE TABLE events PARTITION BY HASH (user_id);
+
+CREATE TABLE events_0 PARTITION OF events FOR VALUES WITH (MODULUS 8, REMAINDER 0);
+CREATE TABLE events_1 PARTITION OF events FOR VALUES WITH (MODULUS 8, REMAINDER 1);
+-- ... events_2 through events_7
+```
+
+### Benefits of Partitioning
+
+| Benefit | How |
+|---|---|
+| **Query performance** | Partition pruning skips irrelevant data; smaller indexes per partition |
+| **Maintenance** | `VACUUM`, `ANALYZE`, index rebuilds run per-partition, not the whole table |
+| **Data lifecycle** | Drop an entire partition (instant) instead of `DELETE` rows (slow, bloats WAL) |
+| **Parallel query** | Database can scan partitions in parallel on multi-core machines |
+
+```sql
+-- Dropping a month of data: instant, no WAL bloat
+DROP TABLE orders_2022;
+
+-- vs deleting rows: slow, generates huge WAL, causes table bloat
+DELETE FROM orders WHERE created_at < '2023-01-01';
+```
+
+### Partitioning Limits
+
+- Does not help with write throughput — all writes still go to one primary.
+- Cross-partition queries (no partition key in `WHERE`) scan all partitions.
+- Adding partitions for new ranges requires DDL — plan the scheme upfront.
+
+---
+
+## Sharding
+
+### What is Sharding?
 
 Sharding splits a single logical database into multiple physical instances called **shards**. Each shard is an independent database that owns a mutually exclusive subset of the data. Together, all shards hold the complete dataset.
 
@@ -53,65 +167,43 @@ A **routing layer** (built into the application, a proxy like ProxySQL, or a pla
  user 0–3M user 3–6M user 6–9M
 ```
 
-## Problem it Solves
+### Sharding Strategies
 
-A single primary database has hard limits: disk I/O throughput, memory for buffer pool, CPU for query execution, and maximum connections. Vertical scaling (bigger machine) eventually hits a ceiling and becomes prohibitively expensive. Read replicas help with reads but not with write throughput — every replica still receives every write from the primary.
-
-Sharding is the answer when the write bottleneck cannot be solved any other way.
-
-## Sharding Strategies
-
-### Hash-based Sharding
-
-The shard key is hashed and the result is mapped to a shard using modulo arithmetic.
+**Hash-based sharding** — the shard key is hashed and mapped to a shard by modulo.
 
 ```
 shard = hash(user_id) % num_shards
-```
 
-**Advantages:** Data distributes evenly across shards regardless of key values. No hot shards from skewed key ranges.
-
-**Disadvantages:** Range queries span all shards. Adding a shard changes the modulo, requiring a full reshard (consistent hashing mitigates this).
-
-```
 user_id = 1042
 hash(1042) = 8239471
 8239471 % 4 = 3  →  Shard 3
 ```
 
-### Range-based Sharding
+Pros: even data distribution. Cons: range queries scatter across all shards; adding shards requires resharding.
 
-Each shard owns a contiguous range of the shard key.
-
-```
-Shard 0: user_id  0 –  999,999
-Shard 1: user_id  1M –  1,999,999
-Shard 2: user_id  2M –  2,999,999
-```
-
-**Advantages:** Range queries (e.g., `WHERE created_at BETWEEN ...`) stay within one shard. Easy to reason about data locality.
-
-**Disadvantages:** New users always go to the last shard — a **monotonically increasing key creates a write hot spot**. Must be mitigated by splitting the hot shard or using a non-monotonic key.
-
-### Directory-based Sharding
-
-A separate lookup table (the directory) maps each key to its shard.
+**Range-based sharding** — each shard owns a contiguous key range.
 
 ```
-users_directory table:
+Shard 0: user_id  0       –  999,999
+Shard 1: user_id  1,000,000 – 1,999,999
+Shard 2: user_id  2,000,000 – 2,999,999
+```
+
+Pros: range queries stay in one shard. Cons: monotonically increasing keys concentrate all new writes on the last shard — a **write hot spot**.
+
+**Directory-based sharding** — a lookup table maps each key to its shard.
+
+```
+lookup table:
  user_id | shard
  --------|------
  1042    |  2
  8801    |  0
 ```
 
-**Advantages:** Arbitrary placement. Easy to move individual records between shards without changing the scheme.
+Pros: arbitrary placement, easy to move records. Cons: the directory is a single point of failure and must be cached aggressively.
 
-**Disadvantages:** The directory itself is a single point of failure and a potential bottleneck. Must be highly available and cached aggressively.
-
-### Consistent Hashing
-
-Keys and shards are placed on a virtual ring. A key is assigned to the nearest shard clockwise on the ring. Adding or removing a shard only redistributes the keys adjacent to that position — roughly `1/n` of total data instead of all of it.
+**Consistent hashing** — keys and shards placed on a virtual ring. A key maps to the nearest shard clockwise. Adding/removing a shard only moves ~1/N of keys.
 
 ```
 Ring:  [Shard A]──[Shard B]──[Shard C]──[Shard D]
@@ -120,79 +212,103 @@ Ring:  [Shard A]──[Shard B]──[Shard C]──[Shard D]
 key hash → 110°  →  assigned to Shard C (nearest clockwise)
 ```
 
-Widely used in distributed caches (Cassandra, DynamoDB, memcached clusters) and increasingly in sharded RDBMS setups.
+Used by Cassandra, DynamoDB, and Redis Cluster. The preferred approach when the number of shards needs to change over time.
 
-## Choosing a Shard Key
+### Choosing a Shard Key
 
-The shard key is the most consequential decision in a sharding design. A bad key causes hot spots, cross-shard queries, or impossible re-sharding.
+The shard key is the most consequential decision in a sharding design.
 
 | Goal | Guidance |
 |---|---|
-| **Even distribution** | Use a high-cardinality key (user ID, UUID). Avoid low-cardinality keys like `country` or `status`. |
-| **Query locality** | The key should match the most common `WHERE` clause. If queries are always by `user_id`, shard on `user_id`. |
-| **Avoid monotonic keys** | Auto-increment IDs and timestamps concentrate all new writes on one shard. Use UUID v4 or hash the key. |
-| **Tenant isolation** | In multi-tenant SaaS, shard on `tenant_id` — all tenant data lives in one shard, queries never cross. |
+| **Even distribution** | Use high-cardinality keys (UUID, user ID). Avoid low-cardinality keys like `country` or `status`. |
+| **Query locality** | Key should match the most common `WHERE` clause. Always querying by `user_id`? Shard on `user_id`. |
+| **Avoid monotonic keys** | Auto-increment IDs and timestamps make the last shard a write hot spot. Use UUID v4 or add a hash prefix. |
+| **Tenant isolation** | In multi-tenant SaaS, shard on `tenant_id` — all tenant data colocates, queries never cross shards. |
 
-## Hot Shards and Rebalancing
+### Hot Shards and Rebalancing
 
-### Hot Shards
-
-A hot shard receives disproportionate traffic — typically because the shard key maps popular data to one shard (a viral user's rows, today's date, etc.).
+**Hot shards** receive disproportionate traffic because the shard key maps popular data to one instance.
 
 Mitigations:
-- **Sub-sharding**: Split the hot shard into multiple smaller shards.
-- **Compound key**: Append a random suffix to the shard key to spread a single entity across shards, then aggregate on read.
-- **Caching**: Place a cache in front of hot-shard data to absorb reads.
+- **Sub-sharding**: split the hot shard into smaller shards.
+- **Compound key**: append a random suffix (`user_id + suffix`) to spread writes, then aggregate on read.
+- **Caching**: absorb reads in front of the hot shard.
 
-### Rebalancing
-
-When shards fill up or traffic skews, data must be moved. This is operationally expensive:
-
+**Rebalancing** when a shard fills up:
 1. Identify the target distribution.
-2. Copy rows to the new shard (online migration, usually done in batches).
-3. Keep the old shard as read-only during the final cutover window.
-4. Update the routing layer to point to the new shard.
-5. Verify, then delete rows from the old shard.
+2. Copy rows to the new shard in batches (online migration).
+3. Make the old shard read-only during the final cutover window.
+4. Update the routing layer.
+5. Verify, then delete moved rows from the old shard.
 
-Tools like Vitess (`VReplication`) and Citus automate most of this but it still requires careful capacity planning.
+Vitess (`VReplication`) and Citus automate most of this, but it still requires careful capacity planning.
+
+---
 
 ## Cross-Shard Operations
-
-Sharding breaks operations that span shard boundaries.
 
 ### Cross-shard queries
 
 ```sql
--- This query requires scanning all shards and merging results:
+-- Requires scatter-gather across all shards, then merge in the router:
 SELECT * FROM orders WHERE amount > 1000 ORDER BY created_at DESC LIMIT 20;
--- (unless shard key = user_id, and user_id is in the WHERE clause)
+-- (no shard key in WHERE — must fan out to all shards)
+
+-- Stays within one shard — shard key present:
+SELECT * FROM orders WHERE user_id = 8821 AND amount > 1000;
 ```
 
-The application or router must fan out the query to all shards, collect results, and merge/sort in memory. This is expensive and latency adds up.
+The router fans the query out to all shards, collects results, and merges/sorts in memory. Latency is the worst single shard plus network overhead.
 
-**Mitigation:** Ensure the most frequent queries always include the shard key in the `WHERE` clause.
+### Distributed transactions (2PC)
 
-### Distributed transactions
+A transaction touching two shards cannot use a local `COMMIT`. It requires two-phase commit:
 
-A transaction that modifies rows on two different shards cannot use a standard `COMMIT`. You need a **two-phase commit (2PC)** protocol:
+```
+1. PREPARE phase
+   Coordinator → Shard A: "Prepare txn X"   → Shard A locks rows, writes WAL
+   Coordinator → Shard B: "Prepare txn X"   → Shard B locks rows, writes WAL
 
-1. **Prepare phase**: Coordinator asks all shards to prepare the transaction (lock rows, write to WAL but do not commit).
-2. **Commit phase**: If all shards reply OK, coordinator tells all shards to commit. If any fail, coordinator sends rollback to all.
+2. COMMIT phase (if both reply OK)
+   Coordinator → Shard A: "Commit txn X"
+   Coordinator → Shard B: "Commit txn X"
 
-2PC is slow and the coordinator is a single point of failure. In practice, most sharded systems avoid cross-shard transactions by designing the data model so that related rows always live on the same shard.
+   If either shard fails to prepare → Coordinator sends ROLLBACK to both
+```
+
+2PC is slow and the coordinator is a single point of failure. In practice, teams design data models so that related rows always live on the same shard, eliminating the need for cross-shard transactions.
+
+---
+
+## Partitioning vs Sharding — When to Use Each
+
+| Scenario | Approach |
+|---|---|
+| Table has grown past 100M rows and queries are slow | Partition by range or hash |
+| Need to archive/expire old data quickly | Partition by time — drop old partitions |
+| Write throughput has saturated the primary | Shard — add instances |
+| Multi-tenant SaaS, tenant data must be isolated | Shard by tenant |
+| Working set fits in RAM, reads are the problem | Read replicas (not sharding) |
+| Don't know which to pick | Partition first; shard if writes become the bottleneck |
+
+---
 
 ## Trade-offs
 
-| | Benefit | Cost |
+| | Partitioning | Sharding |
 |---|---|---|
-| **Write scale** | Linear with number of shards | Each shard must be operated independently |
-| **Fault isolation** | Shard failure affects only its data partition | More infrastructure to monitor and maintain |
-| **Query performance** | Smaller indexes, less lock contention per shard | Cross-shard queries require scatter-gather |
-| **Flexibility** | Works with any relational or document database | Schema changes must be applied to every shard |
+| **Write scale** | No — still one primary | Yes — linear with instance count |
+| **Application change** | None — transparent to the app | Yes — routing logic required |
+| **Cross-entity queries** | Full support within the DB | Scatter-gather across instances |
+| **Operational cost** | Low — same DB cluster | High — N independent clusters |
+| **Data lifecycle** | Instant partition drop | Must migrate data between instances |
+
+---
 
 ## Real-World Usage
 
-- **Instagram (2012)**: Sharded PostgreSQL on `user_id` using a custom logical shard map. ~4,000 logical shards mapped to physical machines, allowing rebalancing without application changes.
-- **Discord**: Sharded Cassandra (consistent hashing) for messages; the channel ID is the partition key so all messages in a channel live on the same node.
-- **Shopify**: Each merchant (tenant) is a shard. All of a merchant's tables are colocated, eliminating cross-shard queries for the common case.
-- **Vitess** (YouTube origin): Middleware that adds transparent sharding on top of MySQL. Handles routing, schema migrations across shards, and online resharding.
+- **Instagram (2012)**: Sharded PostgreSQL on `user_id` using a custom logical shard map — ~4,000 logical shards mapped to physical machines, enabling rebalancing without application changes.
+- **Discord**: Sharded Cassandra (consistent hashing) for messages; `channel_id` is the partition key so all messages in a channel are colocated.
+- **Shopify**: Each merchant is a shard. All merchant tables colocate, eliminating cross-shard queries for the common case.
+- **Vitess** (YouTube origin): Middleware adding transparent sharding over MySQL. Handles routing, schema migrations across shards, and online resharding.
+- **TimescaleDB**: Automatic range partitioning by time on top of PostgreSQL — thousands of hypertable chunks, with automatic retention and compression per chunk.
