@@ -79,11 +79,11 @@
     @apply bg-white/10 -mx-5 px-5;
   }
 
-  /* Prose resets — prevent inline-code styles from bleeding into pre blocks */
+  /* Prose resets — let shiki own the pre background; only reset code inside pre */
   .prose pre {
     margin: 0 !important;
     border-radius: 0 !important;
-    background: transparent !important;
+    /* no background override — shiki sets it via inline style */
   }
 
   .prose pre code {
@@ -92,7 +92,6 @@
     border-radius: 0 !important;
     font-size: inherit !important;
     font-weight: inherit !important;
-    color: inherit !important;
   }
 }
 
