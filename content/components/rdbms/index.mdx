@@ -1,0 +1,114 @@
+---
+title: "RDBMS"
+slug: "rdbms"
+category: "storage"
+summary: "Relational databases store structured data in tables with enforced schemas, ACID transactions, and SQL querying — the default choice for most structured business data."
+usedIn: []
+alternatives:
+  - "caching"
+externalLinks:
+  - label: "PostgreSQL Documentation"
+    url: "https://www.postgresql.org/docs/"
+  - label: "MySQL Documentation"
+    url: "https://dev.mysql.com/doc/"
+  - label: "AWS RDS"
+    url: "https://aws.amazon.com/rds/"
+strengths:
+  - "ACID transactions guarantee data integrity even under failures"
+  - "Rich query language (SQL) with JOINs, aggregates, and window functions"
+  - "Foreign keys and constraints enforce referential integrity at the database level"
+  - "Mature tooling, broad ecosystem, and decades of operational knowledge"
+  - "Strong consistency — reads always reflect the latest committed write"
+weaknesses:
+  - "Vertical scaling hits a ceiling faster than horizontally-sharded stores"
+  - "Schema migrations on large tables are painful and require careful planning"
+  - "Joins across very large datasets can become expensive"
+  - "Not a natural fit for unstructured or highly variable data"
+bestFor:
+  - "Financial transactions and any workload where correctness matters more than throughput"
+  - "Applications with complex relationships between entities"
+  - "Reporting and analytics that need ad-hoc SQL queries"
+  - "Systems where data integrity constraints must be enforced at the storage layer"
+notFor:
+  - "Massive write throughput at global scale (prefer distributed NoSQL)"
+  - "Storing large blobs like images or video (use object storage)"
+  - "Purely key-value or document access patterns with no relational queries"
+---
+
+## What is an RDBMS?
+
+A Relational Database Management System (RDBMS) stores data as rows in tables with a fixed schema. Relationships between tables are expressed via primary and foreign keys. Data is queried using SQL (Structured Query Language), which supports filtering, joining, grouping, and aggregating across tables.
+
+Postgres, MySQL, and SQLite are the most common open-source options. Managed cloud offerings (AWS RDS, Cloud SQL, Azure Database) handle provisioning, backups, and failover.
+
+## Problem it Solves
+
+Most business data is inherently relational — users have orders, orders have line items, line items reference products. An RDBMS lets you model those relationships explicitly, query across them efficiently, and guarantee that writes are consistent even when multiple things happen simultaneously.
+
+## ACID Guarantees
+
+ACID is what separates an RDBMS from simpler data stores:
+
+| Property | Meaning |
+|---|---|
+| **Atomicity** | A transaction fully commits or fully rolls back — no partial writes |
+| **Consistency** | Every transaction brings the database from one valid state to another |
+| **Isolation** | Concurrent transactions don't interfere with each other |
+| **Durability** | Once committed, data survives crashes and restarts |
+
+These properties make RDBMS the default choice when money, inventory, or any "must not be wrong" data is involved.
+
+## How Reads and Writes Work
+
+```
+Client
+  │
+  ├── Write (INSERT/UPDATE) ──► Query Planner ──► WAL (Write-Ahead Log) ──► Storage
+  │
+  └── Read (SELECT) ──► Query Planner ──► Buffer Pool (cache) ──► Storage (on miss)
+```
+
+The **Write-Ahead Log (WAL)** is what makes durability and replication possible — every change is logged before it's applied. Replicas tail the WAL to stay in sync.
+
+The **buffer pool** is an in-memory cache of hot data pages. Most read-heavy workloads are served from memory once the buffer pool is warm.
+
+## Scaling Patterns
+
+| Pattern | How | Trade-off |
+|---|---|---|
+| **Vertical scaling** | Bigger machine, more RAM | Simple but hits ceiling |
+| **Read replicas** | Route SELECTs to replicas | Eventual consistency on reads |
+| **Connection pooling** | PgBouncer / RDS Proxy between app and DB | Reduces connection overhead |
+| **Partitioning** | Split one large table by range or hash | Keeps indexes small, complicates queries |
+| **Sharding** | Multiple independent DB instances by tenant/key | Eliminates cross-shard JOINs |
+
+Most applications should exhaust vertical scaling and read replicas before reaching for sharding — sharding eliminates cross-shard JOINs and complicates transactions significantly.
+
+## Indexing
+
+Indexes are the primary performance lever. Without them, every query does a full table scan.
+
+| Index type | Best for |
+|---|---|
+| **B-tree** (default) | Equality (`=`) and range (`<`, `>`, `BETWEEN`) lookups |
+| **Hash** | Equality-only lookups, slightly faster than B-tree |
+| **GIN / GiST** | Full-text search, JSONB columns, arrays |
+| **Partial index** | Index only rows matching a condition (e.g., `WHERE deleted_at IS NULL`) |
+
+Over-indexing slows writes because every index must be updated on INSERT/UPDATE/DELETE.
+
+## Trade-offs
+
+| | Benefit | Cost |
+|---|---|---|
+| **Consistency** | ACID transactions, no lost writes | Serialization adds latency under high concurrency |
+| **Flexibility** | SQL handles complex queries without code | Schema changes on live tables require migrations |
+| **Reliability** | Battle-tested, well-understood failure modes | Single primary is a bottleneck for write-heavy workloads |
+| **Operability** | Managed services handle most ops burden | Still requires tuning indexes and query plans |
+
+## Real-World Usage
+
+- **PostgreSQL** — the default choice for new projects; supports JSONB, full-text search, and advanced indexing
+- **MySQL / MariaDB** — widely deployed, strong replication story
+- **SQLite** — embedded, zero-configuration; used in mobile apps and local tooling
+- **Amazon Aurora** — PostgreSQL/MySQL-compatible with distributed storage that auto-scales up to 128 TB
