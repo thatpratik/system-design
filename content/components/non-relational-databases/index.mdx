@@ -1,0 +1,255 @@
+---
+title: "Non-Relational Databases"
+slug: "non-relational-databases"
+category: "storage"
+summary: "A family of databases that abandon the relational table model in favour of data structures optimised for specific access patterns — documents, key-value pairs, wide columns, graphs, and time series."
+usedIn: []
+alternatives:
+  - "rdbms"
+externalLinks:
+  - label: "MongoDB Documentation"
+    url: "https://www.mongodb.com/docs/"
+  - label: "Redis Documentation"
+    url: "https://redis.io/docs/"
+  - label: "Apache Cassandra Documentation"
+    url: "https://cassandra.apache.org/doc/latest/"
+  - label: "DynamoDB Developer Guide"
+    url: "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/"
+strengths:
+  - "Schema flexibility — fields vary per document or record without a migration"
+  - "Horizontal write scaling is a first-class design goal, not an afterthought"
+  - "Data models match the access pattern, eliminating expensive JOINs"
+  - "Many types are purpose-built for a workload (search, graph, time series)"
+weaknesses:
+  - "Weak or no multi-document ACID transactions in most systems"
+  - "No standard query language — each database has its own API"
+  - "Denormalisation means the same data lives in multiple places, creating update anomalies"
+  - "Consistency guarantees vary widely and are easy to misconfigure"
+bestFor:
+  - "Unstructured or semi-structured data with variable fields"
+  - "High write throughput distributed across many nodes (Cassandra, DynamoDB)"
+  - "Real-time access by a known key (Redis, DynamoDB)"
+  - "Hierarchical or nested data that maps naturally to documents (MongoDB)"
+notFor:
+  - "Complex multi-entity queries with many relationships"
+  - "Financial or inventory data where ACID transactions are non-negotiable"
+  - "Ad-hoc reporting and analytics that need flexible SQL"
+---
+
+## What Are Non-Relational Databases?
+
+Non-relational databases (commonly called NoSQL) are a broad category of storage systems that organise data in ways other than the row-and-column table model of an RDBMS. Each type is optimised for a specific access pattern. There is no single "NoSQL" — there are at least five distinct families.
+
+The term emerged around 2009 as web companies (Google, Amazon, Facebook) hit the scaling limits of relational databases and built purpose-built systems: Bigtable, Dynamo, Cassandra.
+
+---
+
+## The Five Families
+
+### 1. Key-Value Stores
+
+The simplest model: a distributed hash map. Every record is a value addressed by a unique key. There is no structure inside the value — it can be a string, blob, JSON, or binary.
+
+**Access pattern:** `GET key`, `SET key value`, `DELETE key`. Nothing else.
+
+**Examples:** Redis, DynamoDB (at its core), Memcached, etcd
+
+**Redis — richer than a plain key-value store:**
+
+```
+# Strings
+SET session:u8821 '{"user_id": 8821, "role": "admin"}' EX 3600
+
+# Sorted sets — leaderboards
+ZADD leaderboard 9420 "alice"
+ZADD leaderboard 8810 "bob"
+ZRANGE leaderboard 0 9 REV WITHSCORES   -- top 10
+
+# Pub/Sub
+SUBSCRIBE notifications:u8821
+PUBLISH notifications:u8821 '{"type":"message","from":"bob"}'
+```
+
+**When to use:** Session storage, rate limit counters, caches, leaderboards, real-time pub/sub, distributed locks.
+
+---
+
+### 2. Document Stores
+
+Each record is a self-describing document — usually JSON or BSON — that can contain nested objects and arrays. No fixed schema is enforced; different documents in the same collection can have different fields.
+
+**Examples:** MongoDB, Firestore, CouchDB, DocumentDB
+
+**MongoDB — document model:**
+
+```js
+// A product document — nested, variable structure
+{
+  "_id": "prod_9821",
+  "name": "Wireless Headphones",
+  "price": 79.99,
+  "tags": ["audio", "wireless"],
+  "specs": {
+    "battery_hours": 30,
+    "bluetooth": "5.2"
+  },
+  "reviews": [
+    { "user": "alice", "rating": 5, "text": "Great sound" },
+    { "user": "bob",   "rating": 4, "text": "Comfortable" }
+  ]
+}
+
+// Query — no JOIN needed, reviews are embedded
+db.products.find(
+  { "specs.bluetooth": "5.2", price: { $lt: 100 } },
+  { name: 1, price: 1 }
+)
+```
+
+**Embedding vs referencing:** The central design decision in a document store. Embed data that is always read together; reference data that is read or updated independently.
+
+| Embed when | Reference when |
+|---|---|
+| Child data is always read with the parent | Child data is large or unbounded |
+| Child has a bounded, small set | Child is shared by multiple parents |
+| Updates happen together | Child is updated independently and frequently |
+
+**When to use:** Product catalogs, CMS content, user profiles, event logs, any entity with nested or variable attributes.
+
+---
+
+### 3. Wide-Column Stores
+
+Data is organised in rows with a flexible number of columns. Unlike a relational table, different rows can have entirely different columns. Rows are grouped into column families.
+
+The defining property: **data is partitioned by row key, sorted by column key within a row**. This makes range scans on columns extremely efficient.
+
+**Examples:** Apache Cassandra, HBase, Google Bigtable, AWS Keyspaces
+
+**Cassandra data model:**
+
+```sql
+-- Schema designed around the query, not the entity
+CREATE TABLE messages_by_channel (
+  channel_id  UUID,
+  sent_at     TIMESTAMP,
+  message_id  UUID,
+  sender_id   UUID,
+  body        TEXT,
+  PRIMARY KEY (channel_id, sent_at, message_id)
+) WITH CLUSTERING ORDER BY (sent_at DESC);
+
+-- Retrieve latest 50 messages for a channel — single partition, no scatter
+SELECT * FROM messages_by_channel
+WHERE channel_id = ?
+LIMIT 50;
+```
+
+**Cassandra's consistency model:** Cassandra uses a tunable consistency quorum. For `N` replicas, a write/read can require acknowledgment from `1`, `QUORUM` (N/2+1), or `ALL` replicas.
+
+```
+N = 3 replicas
+
+Write QUORUM (2 nodes):  tolerates 1 node down, eventual consistency
+Write ALL    (3 nodes):  no tolerance for failure, strong consistency
+Write ONE    (1 node):   fastest, highest risk of stale reads
+```
+
+The **CAP theorem** applies concretely: Cassandra favors **AP** (Availability + Partition Tolerance). It will accept writes during a network partition and reconcile conflicts later using last-write-wins or application-defined merge.
+
+**When to use:** High write throughput across many nodes, time-series data, IoT event streams, chat messages, activity logs, any workload where the query pattern is known upfront and the partition key is clear.
+
+---
+
+### 4. Graph Databases
+
+Data is stored as **nodes** (entities) and **edges** (relationships). Traversing relationships is a first-class operation — O(degree) per hop rather than O(table size) JOINs.
+
+**Examples:** Neo4j, Amazon Neptune, JanusGraph, ArangoDB
+
+**Neo4j — Cypher query language:**
+
+```cypher
+-- Find friends of friends who like "Jazz" that Alice doesn't already follow
+MATCH (alice:User {name: "Alice"})-[:FOLLOWS]->(friend)-[:FOLLOWS]->(fof)
+WHERE NOT (alice)-[:FOLLOWS]->(fof)
+  AND (fof)-[:LIKES]->(:Genre {name: "Jazz"})
+RETURN fof.name, COUNT(*) AS mutual_friends
+ORDER BY mutual_friends DESC
+LIMIT 10
+```
+
+The same query in SQL requires multiple self-joins on a friends table, which becomes progressively slower as the graph deepens.
+
+**When to use:** Social graphs, recommendation engines, fraud detection (following relationship chains), knowledge graphs, access control with hierarchical roles, network topology.
+
+---
+
+### 5. Time-Series Databases
+
+Optimised for append-only streams of timestamped measurements. Storage is column-oriented (all values for one metric stored contiguously), enabling very high compression and fast range aggregations.
+
+**Examples:** InfluxDB, TimescaleDB (Postgres extension), Prometheus, ClickHouse
+
+**InfluxDB — line protocol and query:**
+
+```
+# Write: measurement,tags field=value timestamp
+cpu_usage,host=web-01,region=us-east usage=72.5 1718000000000000000
+cpu_usage,host=web-02,region=us-east usage=41.2 1718000000000000000
+
+# Query: average CPU per host over last hour
+SELECT mean("usage") FROM "cpu_usage"
+WHERE time > now() - 1h
+GROUP BY "host", time(5m)
+```
+
+**Retention policies and downsampling:** Raw data at 1-second granularity is expensive to retain long-term. Time-series databases support automatic downsampling — e.g., aggregate to 1-minute averages after 7 days, 1-hour averages after 90 days, then discard raw data.
+
+**When to use:** Infrastructure monitoring, application metrics, financial tick data, IoT sensor streams, any workload where every record has a timestamp and queries are always time-bounded ranges.
+
+---
+
+## BASE vs ACID
+
+Most NoSQL systems replace ACID guarantees with a weaker model called **BASE**:
+
+| | ACID (RDBMS) | BASE (most NoSQL) |
+|---|---|---|
+| **Consistency** | Strong — every read reflects the latest write | Eventual — replicas converge over time |
+| **Availability** | May reject writes to maintain consistency | Always accepts writes |
+| **Partition behavior** | Consistent (CP systems) | Available (AP systems) |
+
+**Basically Available:** The system remains operational even during partial failures.
+
+**Soft State:** State may change over time even without new input (replicas catching up).
+
+**Eventually Consistent:** All replicas will converge to the same value given enough time and no new writes.
+
+```
+Example — eventual consistency in DynamoDB:
+
+t=0ms  User updates their username to "alice_v2"
+         → Write succeeds on primary node
+t=50ms  User reads their profile on a different node
+         → May still see "alice_v1" (replica not yet updated)
+t=200ms Replication completes across all nodes
+         → All reads return "alice_v2"
+```
+
+Some NoSQL databases do offer strong consistency as an option (DynamoDB with `ConsistentRead=true`, MongoDB with majority write concern), but this comes at a latency cost.
+
+---
+
+## Choosing Within the NoSQL Family
+
+| Your primary need | Database type | Representative choice |
+|---|---|---|
+| Sub-millisecond key lookup at scale | Key-value | Redis, DynamoDB |
+| Flexible nested documents, rich queries | Document | MongoDB, Firestore |
+| Massive write throughput, known query patterns | Wide-column | Cassandra, Bigtable |
+| Relationship traversal, graph algorithms | Graph | Neo4j, Neptune |
+| Timestamped metrics, monitoring | Time-series | InfluxDB, TimescaleDB |
+| Full-text search with relevance ranking | Search | Elasticsearch, OpenSearch |
+
+For help choosing between NoSQL and RDBMS, see [Picking the Right Database](/components/picking-the-right-database).
