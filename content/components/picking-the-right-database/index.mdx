@@ -1,0 +1,207 @@
+---
+title: "Picking the Right Database"
+slug: "picking-the-right-database"
+category: "storage"
+summary: "A structured decision framework for choosing between relational and non-relational databases — and within each family — based on access patterns, consistency requirements, and scale."
+usedIn: []
+alternatives: []
+externalLinks:
+  - label: "AWS Database Selection Guide"
+    url: "https://aws.amazon.com/products/databases/"
+  - label: "Martin Fowler — NoSQL Distilled"
+    url: "https://martinfowler.com/books/nosql.html"
+strengths:
+  - "Prevents costly late-stage migrations by choosing the right model upfront"
+  - "Access-pattern analysis surfaces the right trade-offs before writing any schema"
+weaknesses:
+  - "No universal answer — the right choice always depends on context"
+  - "Teams often need to run multiple database types for different concerns in one system"
+bestFor:
+  - "Greenfield system design where the data model is not yet committed"
+  - "Architecture reviews where a database choice is being questioned"
+  - "Preparing for system design interviews"
+notFor:
+  - "Replacing a production database without a migration plan and clear bottleneck evidence"
+---
+
+## The Core Question
+
+Database selection is not about picking the most popular tool or the one your team knows best. It is about matching the **data model**, **access patterns**, and **consistency requirements** of your workload to a storage system designed for exactly those characteristics.
+
+The wrong database choice surfaces as: slow queries that can't be fixed by indexing, schema migrations that require downtime, inability to scale the bottleneck, or subtle consistency bugs.
+
+---
+
+## Step 1 — Understand Your Access Patterns
+
+Before picking a database, write down the three most frequent operations your system will perform. The database choice flows from these.
+
+```
+Questions to answer:
+  1. What is the primary key for reads? (user_id, event_id, timestamp, text search?)
+  2. Do reads involve relationships? (JOIN across two+ entities?)
+  3. What is the write pattern? (single-row inserts, bulk appends, updates-in-place?)
+  4. What is the read:write ratio?
+  5. Do you need range queries? (all orders in the last 30 days?)
+  6. Does data change shape over time? (different fields per record?)
+```
+
+---
+
+## Step 2 — Consistency Requirements
+
+How wrong can the data be, and for how long?
+
+| Requirement | Fits |
+|---|---|
+| **ACID transactions** — money, inventory, bookings | RDBMS |
+| **Strong consistency** — reads always reflect the latest write | RDBMS, or NoSQL with synchronous replication |
+| **Eventual consistency is acceptable** — social feeds, analytics, counts | Cassandra, DynamoDB, Redis |
+| **No consistency needed** — ephemeral, cache-only | Redis, Memcached |
+
+If you are touching money, medical records, or any data where an incorrect state is a business or legal problem, start with RDBMS unless you have a specific, justified reason not to.
+
+---
+
+## Step 3 — The Decision Tree
+
+```
+Is the data relational?
+(entities have FK relationships; queries JOIN across them)
+│
+├── YES → Do you need ACID transactions?
+│          │
+│          ├── YES → RDBMS (PostgreSQL, MySQL)
+│          │
+│          └── NO  → Do you need flexible schema?
+│                     ├── YES → Document store (MongoDB)
+│                     └── NO  → RDBMS is still fine
+│
+└── NO → What is the primary access pattern?
+          │
+          ├── Lookup by key, sub-ms latency      → Key-value (Redis, DynamoDB)
+          ├── Nested / variable-field documents  → Document (MongoDB, Firestore)
+          ├── High write throughput, known query → Wide-column (Cassandra, Bigtable)
+          ├── Relationship traversal             → Graph (Neo4j, Neptune)
+          ├── Timestamped metrics / events       → Time-series (InfluxDB, TimescaleDB)
+          └── Full-text search + relevance       → Search (Elasticsearch)
+```
+
+---
+
+## Relational vs Non-Relational at a Glance
+
+| Factor | RDBMS | Non-Relational |
+|---|---|---|
+| **Data model** | Normalised tables, strict schema | Flexible: document, key-value, column, graph |
+| **Relationships** | First-class (FK, JOIN) | Manual (embed or reference; no JOIN) |
+| **Transactions** | ACID across multiple rows/tables | Usually single-document or none |
+| **Schema changes** | Migration required | Often schemaless — add fields freely |
+| **Read patterns** | Ad-hoc SQL, flexible | Query patterns must be known upfront |
+| **Write scale** | Vertical first; sharding is complex | Horizontal-first design (Cassandra, DynamoDB) |
+| **Consistency** | Strong by default | Configurable; often eventual |
+| **Tooling** | Mature (decades), universal SQL | Varies per database; no standard language |
+
+---
+
+## Common Workloads and Their Fits
+
+### E-commerce platform
+
+```
+Users, orders, products, payments → RDBMS (PostgreSQL)
+  Reason: orders reference users and products via FK;
+          checkout must be ACID; ad-hoc reporting is frequent.
+
+Product search → Elasticsearch
+  Reason: full-text + faceted filtering doesn't map well to SQL LIKE.
+
+Session / cart → Redis
+  Reason: sub-ms access, TTL-based expiry, no need for durability.
+```
+
+### Social network (large scale)
+
+```
+User profiles, posts → RDBMS or Document store
+  For structured profiles: PostgreSQL
+  For variable media attachments: MongoDB
+
+Social graph (follows, blocks) → Graph DB (Neo4j) or adjacency list in Postgres
+  Use graph DB if traversal depth > 2–3 hops is frequent.
+
+Feed / timeline → Cassandra or Redis sorted sets
+  Reason: high write throughput; timeline is always partitioned by user_id;
+          eventual consistency is acceptable.
+
+Direct messages → Cassandra
+  Reason: partitioned by channel_id; time-ordered; massive append throughput.
+```
+
+### IoT / monitoring system
+
+```
+Raw sensor data → Time-series DB (InfluxDB, TimescaleDB)
+  Reason: timestamped appends at high rate; range queries by time;
+          retention policies and downsampling are built-in.
+
+Device registry / metadata → RDBMS
+  Reason: device properties are structured and relational.
+
+Real-time alerting thresholds → Redis
+  Reason: sub-ms reads; updated infrequently.
+```
+
+### Multi-tenant SaaS
+
+```
+All tenant data → RDBMS (PostgreSQL)
+  Strategy A: one schema per tenant (row-level isolation)
+  Strategy B: tenant_id column on every table (simpler, shared schema)
+
+At large scale → Shard by tenant_id
+  Each shard holds N tenants; tenant data never crosses shard boundary.
+```
+
+---
+
+## When to Use Multiple Databases
+
+Most production systems above moderate scale use more than one database type. The pattern is:
+
+1. **RDBMS as the system of record** — the authoritative source of truth, ACID-consistent.
+2. **Cache (Redis)** — absorbs hot reads; short TTL; tolerate staleness.
+3. **Search index (Elasticsearch)** — full-text and faceted search; synced from RDBMS via CDC.
+4. **Analytics store (ClickHouse / Redshift)** — columnar, append-only copy for reporting; synced via batch or streaming.
+
+```
+Write path:   API → PostgreSQL (primary)
+                          │
+              ┌───────────┼────────────┐
+              ▼           ▼            ▼
+          Redis cache  Elasticsearch  ClickHouse
+          (hot reads)  (search index) (analytics)
+```
+
+Complexity increases with each additional store. Only add a store when the primary database demonstrably cannot serve the access pattern.
+
+---
+
+## Red Flags in Existing Choices
+
+| Observation | Likely wrong fit |
+|---|---|
+| RDBMS with a `data JSONB` column that's always queried by internal fields | Should be a document store |
+| NoSQL store where you're doing multiple reads to reconstruct a JOIN | Should be RDBMS or denormalise the write model |
+| Redis used as primary storage with no durability config | Wrong use of a cache as a DB |
+| Cassandra with a query that has no partition key in `WHERE` | Bad data model — wrong tool or wrong schema |
+| PostgreSQL at 10M rows/day with no partitioning or archival plan | Will hit performance wall within months |
+
+---
+
+## Further Reading
+
+- [RDBMS](/components/rdbms) — deep dive into relational databases, ACID, isolation levels, and consistency enforcement
+- [Non-Relational Databases](/components/non-relational-databases) — all five NoSQL families with schema examples and trade-offs
+- [Scaling Databases](/components/scaling-databases) — read replicas, caching, CQRS, and sharding in order of complexity
+- [Sharding & Partitioning](/components/database-sharding) — horizontal split strategies with decision framework
