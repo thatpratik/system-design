@@ -1,0 +1,203 @@
+---
+title: "Scaling Databases"
+slug: "scaling-databases"
+category: "storage"
+summary: "A structured approach to removing database bottlenecks — from vertical scaling and read replicas through connection pooling, caching, and sharding — applied in order of increasing complexity."
+usedIn: []
+alternatives: []
+externalLinks:
+  - label: "PgBouncer Documentation"
+    url: "https://www.pgbouncer.org/usage.html"
+  - label: "AWS RDS Read Replicas"
+    url: "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.html"
+  - label: "Vitess — Scaling MySQL"
+    url: "https://vitess.io/docs/concepts/scalability-philosophy/"
+strengths:
+  - "Each scaling tier is independently applicable — no need to commit to the full stack"
+  - "Well-understood failure modes at each level with mature tooling"
+  - "Vertical scaling and read replicas require zero application changes"
+  - "Layering caching and pooling can multiply effective capacity without touching the schema"
+weaknesses:
+  - "Each additional layer adds operational complexity and new failure modes"
+  - "Write scaling ultimately requires sharding, which constrains the data model"
+  - "Replication lag means replicas may serve stale reads"
+  - "Caching adds consistency risk if invalidation is not handled carefully"
+bestFor:
+  - "Applications growing past what a single database can handle"
+  - "Read-heavy workloads where replicas and caches can absorb most traffic"
+  - "Teams that want to delay sharding as long as possible by exhausting simpler options first"
+notFor:
+  - "Replacing proper data modelling — a badly normalised schema will not scale regardless of the tier"
+  - "Eliminating all consistency concerns — every scaling tier introduces trade-offs"
+---
+
+## The Scaling Ladder
+
+Database scaling is not one decision — it is a sequence of increasingly complex interventions. Each level buys more headroom. The goal is to stay at the simplest level that meets your requirements.
+
+```
+Level 0  ──  Single primary (where everyone starts)
+Level 1  ──  Vertical scaling        (bigger machine)
+Level 2  ──  Connection pooling      (more efficient use of the same machine)
+Level 3  ──  Read replicas           (scale reads horizontally)
+Level 4  ──  Caching layer           (absorb hot reads before they hit the DB)
+Level 5  ──  CQRS / read models      (purpose-built read stores)
+Level 6  ──  Sharding                (scale writes horizontally)
+```
+
+Most applications never need to go past Level 3. Measure before moving up.
+
+---
+
+## Level 1 — Vertical Scaling
+
+The simplest move: give the database more CPU, RAM, and faster disks.
+
+**What it fixes:** The database is CPU-bound (complex queries), I/O-bound (buffer pool too small for the working set), or connection-limited.
+
+**How RAM helps:** The database buffer pool caches hot data pages in memory. Doubling RAM can eliminate a large fraction of disk reads if the working set fits. A common rule of thumb: if your buffer pool hit rate is below 95%, more RAM will help more than a faster disk.
+
+**Limits:** Vertical scaling is bounded by the largest available machine. Cloud instances top out, and the cost curve is non-linear — the largest instance may cost 8× as much as the next tier while delivering 2× improvement.
+
+**When to apply:** Before any horizontal technique. It requires no application changes.
+
+---
+
+## Level 2 — Connection Pooling
+
+Every database connection consumes memory on the server (PostgreSQL uses ~5–10 MB per connection). Applications with many concurrent threads or serverless functions can exhaust available connections before hitting any CPU or I/O limit.
+
+A **connection pooler** sits between the application and the database, multiplexing many application connections onto a smaller pool of actual database connections.
+
+```
+  App server 1 ──┐
+  App server 2 ──┼──► PgBouncer / ProxySQL ──► DB Primary (20 real connections)
+  App server 3 ──┘
+  (300 app-side connections)
+```
+
+| Pooler | Mode | Notes |
+|---|---|---|
+| **PgBouncer** | Transaction pooling | Lowest overhead; connection returned to pool after each transaction |
+| **ProxySQL** | Session / transaction | MySQL-focused; also does query routing |
+| **RDS Proxy** | Session pooling | Managed AWS option; integrates with IAM and Secrets Manager |
+| **pgpool-II** | Session / transaction | Also handles load balancing and failover |
+
+**Transaction pooling** (PgBouncer's default) is the most efficient: a connection is held only for the duration of one transaction, then returned. This allows thousands of app connections to share tens of database connections.
+
+**What to watch:** Transaction pooling is incompatible with session-scoped features like `SET LOCAL`, advisory locks, and prepared statements that persist across transactions.
+
+---
+
+## Level 3 — Read Replicas
+
+The primary handles all writes. Replicas receive a stream of changes (WAL in PostgreSQL, binlog in MySQL) and apply them asynchronously, staying nearly in sync.
+
+```
+          Writes
+            │
+        ┌───▼────┐
+        │ Primary │──── replication stream ────►  Replica 1
+        └─────────┘                           └►  Replica 2
+                                              └►  Replica 3
+          Reads
+            │
+    ┌───────┼───────┐
+    ▼       ▼       ▼
+ Replica 1  2       3   (load-balanced)
+```
+
+**What it fixes:** Read throughput. Each replica adds independent read capacity. This is the correct solution for read-heavy workloads (reporting, search, dashboards, user-facing feeds).
+
+**Replication lag:** Replicas are eventually consistent. A write to the primary may not be visible on a replica for milliseconds to seconds, depending on load.
+
+Mitigation strategies for lag:
+- **Read-your-writes consistency:** Route a user's reads to the primary (or the same replica) immediately after they write.
+- **Lag-aware routing:** Query `pg_stat_replication` / `SHOW SLAVE STATUS` and skip replicas that are behind by more than a threshold.
+- **Synchronous replication:** One or more replicas can be made synchronous (commit waits for acknowledgment). This eliminates lag at the cost of write latency.
+
+**How many replicas:** One replica covers most read-heavy apps. Add a second for HA failover. Beyond two, consider whether a caching layer (Level 4) would be cheaper.
+
+---
+
+## Level 4 — Caching Layer
+
+A cache (Redis, Memcached) sits in front of the database and serves frequently read data from memory without touching the database at all.
+
+```
+Client ──► Cache (Redis)
+              │ hit: return immediately
+              │ miss: read from DB, populate cache, return
+              ▼
+           Primary / Replica
+```
+
+**What it fixes:** Hot-spot reads — the same rows or queries being repeated many times per second. A well-tuned cache can reduce database read load by 80–95%.
+
+**Cache-aside pattern (most common):**
+
+```
+value = cache.get(key)
+if value is None:
+    value = db.query(...)
+    cache.set(key, value, ttl=300)
+return value
+```
+
+**What caching does not fix:** Write throughput. Every write still hits the primary. Caching only deflects reads.
+
+**Invalidation:** The hardest part. Options:
+- **TTL-based:** Entries expire after N seconds. Simple but serves stale data up to TTL.
+- **Write-through:** Invalidate or update cache on every write. Consistent but adds write-path complexity.
+- **Event-driven:** Database triggers or CDC (Change Data Capture) emit events that invalidate cache entries.
+
+---
+
+## Level 5 — CQRS and Purpose-Built Read Models
+
+**Command Query Responsibility Segregation (CQRS)** separates the write model (commands, normalised RDBMS) from the read model (queries, denormalised store optimised for specific access patterns).
+
+```
+Write path:   API ──► Command Handler ──► RDBMS (normalised, ACID)
+                                            │
+                                            └── event / CDC stream
+                                                     │
+Read path:    API ──► Query Handler  ──► Read Store ◄┘
+                                         (Elasticsearch, Redis, DynamoDB,
+                                          or a denormalised Postgres table)
+```
+
+**When to use:** When the read access pattern is fundamentally different from the write model:
+- Full-text search → Elasticsearch / OpenSearch
+- Aggregated dashboards → a materialized summary table or a columnar store
+- Low-latency personalised feeds → a Redis sorted set pre-computed at write time
+
+**Cost:** The write path must propagate changes to the read model. This adds latency, a synchronisation component that can fail, and eventual consistency between command and query sides.
+
+---
+
+## Level 6 — Sharding
+
+When writes saturate the primary and vertical scaling has no room left, the write workload must be split across multiple independent database instances. Each instance (shard) owns a partition of the data.
+
+This is covered in depth in the [Database Sharding](/components/database-sharding) component. The key point in the scaling context:
+
+- Sharding is a last resort, not a starting point.
+- It eliminates cross-shard JOINs and distributed transactions.
+- It constrains the data model permanently around the shard key.
+- Exhaust Levels 1–5 before committing to it.
+
+---
+
+## Decision Framework
+
+| Symptom | Likely Bottleneck | First Action |
+|---|---|---|
+| Queries slow despite indexes | CPU / buffer pool too small | Vertical scale (more RAM) |
+| `too many connections` errors | Connection exhaustion | Add PgBouncer |
+| High read latency, low write volume | Read throughput | Add read replica |
+| Same rows/queries hit repeatedly | Hot-spot reads | Add caching layer |
+| Write latency growing under load | Write throughput on primary | Check indexes, then consider CQRS or sharding |
+| Disk I/O at ceiling | Working set larger than RAM | Vertical scale or add read replicas to distribute I/O |
+
+**The rule:** measure first. `pg_stat_statements`, `EXPLAIN ANALYZE`, and slow query logs tell you exactly which query is the problem and why. Never choose a scaling tier based on intuition alone.
