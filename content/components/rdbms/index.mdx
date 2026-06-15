@@ -47,16 +47,216 @@ Most business data is inherently relational — users have orders, orders have l
 
 ## ACID Guarantees
 
-ACID is what separates an RDBMS from simpler data stores:
+ACID is what separates an RDBMS from simpler data stores. Each property addresses a specific failure mode.
 
-| Property | Meaning |
+### Atomicity
+
+A transaction is an all-or-nothing unit. Either every statement in it commits, or none of them do. There is no in-between state visible to anyone.
+
+**Example — bank transfer:**
+```sql
+BEGIN;
+  UPDATE accounts SET balance = balance - 500 WHERE id = 1;
+  UPDATE accounts SET balance = balance + 500 WHERE id = 2;
+COMMIT;
+```
+If the database crashes between the two `UPDATE`s, neither change is applied when the server restarts. The `ROLLBACK` happens automatically. You will never end up with money deducted from account 1 but not credited to account 2.
+
+### Consistency
+
+Every transaction must leave the database in a state that satisfies all defined rules — constraints, foreign keys, triggers, and application-level invariants. A transaction that would violate a rule is rejected entirely.
+
+**Example:** A `NOT NULL` constraint on `orders.user_id` means you can never insert an order with no owner. The database enforces this on every write, so the application never has to defensively check.
+
+### Isolation
+
+Concurrent transactions behave as if they ran one after another, not simultaneously. Without isolation, one transaction could read partial state written by another that hasn't committed yet.
+
+**Example — double booking problem:**
+
+```
+T1: SELECT seats_available FROM flights WHERE id = 42;  -- reads 1
+T2: SELECT seats_available FROM flights WHERE id = 42;  -- reads 1
+T1: UPDATE flights SET seats_available = 0 WHERE id = 42;
+T2: UPDATE flights SET seats_available = 0 WHERE id = 42;
+COMMIT T1; COMMIT T2;  -- both succeed, but two tickets were sold for one seat
+```
+
+Proper isolation (using `SELECT ... FOR UPDATE` or serializable isolation) prevents T2 from reading the stale value after T1 has locked the row.
+
+### Durability
+
+Once a transaction commits, its changes survive crashes, power loss, and restarts. This is implemented via the Write-Ahead Log (WAL): changes are written to an append-only log on disk before they are applied to data pages. On recovery, the database replays the WAL to restore the committed state.
+
+---
+
+## Isolation Levels
+
+Isolation is a spectrum. Stronger isolation eliminates more concurrency bugs but reduces throughput because transactions block each other more. SQL standard defines four levels:
+
+| Level | Dirty Read | Non-repeatable Read | Phantom Read |
+|---|---|---|---|
+| **Read Uncommitted** | Possible | Possible | Possible |
+| **Read Committed** | Prevented | Possible | Possible |
+| **Repeatable Read** | Prevented | Prevented | Possible |
+| **Serializable** | Prevented | Prevented | Prevented |
+
+**Dirty Read** — reading a row written by a transaction that hasn't committed yet. If that transaction rolls back, you read data that never existed.
+
+**Non-repeatable Read** — reading the same row twice in one transaction and getting different values because another transaction committed a change between your two reads.
+
+**Phantom Read** — running the same range query twice and getting a different set of rows because another transaction inserted or deleted rows in between.
+
+### Level-by-level breakdown
+
+**Read Uncommitted** — transactions can see uncommitted changes from other transactions. Almost never used. The only sensible case is approximate analytics where a few wrong rows don't matter and you want maximum throughput.
+
+**Read Committed** (default in PostgreSQL, Oracle, SQL Server) — a transaction only sees data that was committed before each individual statement ran. Prevents dirty reads. Most application code works correctly at this level.
+
+```sql
+-- Session 1
+BEGIN;
+UPDATE products SET stock = 0 WHERE id = 5;
+-- not yet committed
+
+-- Session 2 (Read Committed)
+SELECT stock FROM products WHERE id = 5;
+-- still sees the old value — dirty read prevented
+```
+
+**Repeatable Read** (default in MySQL InnoDB) — a transaction takes a snapshot of the database at its start and sees that snapshot consistently for the entire transaction, even if other transactions commit changes during that time. Prevents dirty and non-repeatable reads.
+
+```sql
+-- Session 1
+BEGIN;
+SELECT balance FROM accounts WHERE id = 1;  -- sees 1000
+
+-- Session 2 commits: UPDATE accounts SET balance = 500 WHERE id = 1;
+
+-- Session 1 again (Repeatable Read)
+SELECT balance FROM accounts WHERE id = 1;  -- still sees 1000 (snapshot)
+COMMIT;
+```
+
+**Serializable** — the strongest level. Transactions are guaranteed to produce the same result as if they had executed one at a time in some serial order. Implemented via predicate locks or optimistic concurrency (Serializable Snapshot Isolation in PostgreSQL). Use for financial reconciliation, inventory reservation, or any logic where correctness is paramount.
+
+```sql
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+BEGIN;
+SELECT COUNT(*) FROM bookings WHERE flight_id = 42;  -- 99 booked, 1 seat left
+INSERT INTO bookings (flight_id, user_id) VALUES (42, 7);
+COMMIT;
+-- If another transaction concurrently does the same, one will get a serialization error
+-- and must retry — no double booking is possible
+```
+
+**Practical guidance:** Start at Read Committed. Move to Repeatable Read if you see non-repeatable read bugs in multi-step business logic. Use Serializable only for critical sections (checkout, reservation) where you'd otherwise need application-level locking.
+
+---
+
+## Enforcing Consistency
+
+Isolation handles concurrent access. Consistency is enforced through database-level rules that reject or react to invalid data.
+
+### Constraints
+
+Constraints are declarative rules the engine checks on every write. They run automatically — no application code required.
+
+```sql
+CREATE TABLE orders (
+  id          SERIAL PRIMARY KEY,
+  user_id     INT         NOT NULL REFERENCES users(id),   -- FK: user must exist
+  total       NUMERIC     NOT NULL CHECK (total >= 0),     -- no negative totals
+  status      TEXT        NOT NULL DEFAULT 'pending'
+                          CHECK (status IN ('pending','paid','cancelled')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Unique constraint: one active subscription per user
+CREATE UNIQUE INDEX ON subscriptions (user_id) WHERE status = 'active';
+```
+
+| Constraint type | What it enforces |
 |---|---|
-| **Atomicity** | A transaction fully commits or fully rolls back — no partial writes |
-| **Consistency** | Every transaction brings the database from one valid state to another |
-| **Isolation** | Concurrent transactions don't interfere with each other |
-| **Durability** | Once committed, data survives crashes and restarts |
+| `PRIMARY KEY` | Uniqueness + not null on identifier column |
+| `FOREIGN KEY` | Referenced row must exist in parent table |
+| `NOT NULL` | Column must always have a value |
+| `UNIQUE` | No two rows share the same value(s) |
+| `CHECK` | Value must satisfy an arbitrary boolean expression |
 
-These properties make RDBMS the default choice when money, inventory, or any "must not be wrong" data is involved.
+Constraints fail fast at the database layer, not silently in application code. A violated constraint raises an error immediately and rolls back the statement.
+
+### Cascade Actions
+
+Cascade rules define what happens to child rows when the parent is updated or deleted. Without them, deleting a parent with children raises a foreign key error.
+
+```sql
+CREATE TABLE order_items (
+  id       SERIAL PRIMARY KEY,
+  order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  sku      TEXT NOT NULL
+);
+
+-- Deleting an order automatically deletes all its line items
+DELETE FROM orders WHERE id = 101;
+-- → all order_items with order_id = 101 are deleted atomically
+```
+
+| Option | Behaviour |
+|---|---|
+| `ON DELETE CASCADE` | Delete child rows when parent is deleted |
+| `ON DELETE SET NULL` | Set FK column to NULL when parent is deleted |
+| `ON DELETE RESTRICT` | Block deletion if children exist (default) |
+| `ON UPDATE CASCADE` | Update FK column when parent PK changes |
+
+**Use cascade carefully.** A single `DELETE` on a parent can silently remove thousands of child rows across multiple tables. Always verify cascade chains with an `EXPLAIN` or a dry run before enabling in production.
+
+### Triggers
+
+Triggers are functions the database executes automatically before or after a data-changing event. They enforce invariants that can't be expressed as a simple constraint.
+
+```sql
+-- Prevent reducing inventory below zero
+CREATE OR REPLACE FUNCTION check_stock()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.stock < 0 THEN
+    RAISE EXCEPTION 'Stock cannot go negative for product %', NEW.id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_stock
+BEFORE UPDATE ON products
+FOR EACH ROW EXECUTE FUNCTION check_stock();
+```
+
+```sql
+-- Audit log: record every price change
+CREATE OR REPLACE FUNCTION log_price_change()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.price <> OLD.price THEN
+    INSERT INTO price_audit (product_id, old_price, new_price, changed_at)
+    VALUES (OLD.id, OLD.price, NEW.price, NOW());
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER audit_price
+AFTER UPDATE ON products
+FOR EACH ROW EXECUTE FUNCTION log_price_change();
+```
+
+| Trigger timing | When it runs |
+|---|---|
+| `BEFORE` | Before the row is written — can modify or reject the change |
+| `AFTER` | After the row is written — used for side effects (audit logs, notifications) |
+| `INSTEAD OF` | On views — replaces the default write behaviour |
+
+**Trigger trade-offs:** Triggers are powerful but invisible to the application — a developer reading the code won't know a trigger fires. Keep triggers narrow (audit logging, hard invariants), not as a place for business logic that belongs in the application layer.
 
 ## How Reads and Writes Work
 
@@ -74,13 +274,13 @@ The **buffer pool** is an in-memory cache of hot data pages. Most read-heavy wor
 
 ## Scaling Patterns
 
-| Pattern | How | Trade-off |
-|---|---|---|
-| **Vertical scaling** | Bigger machine, more RAM | Simple but hits ceiling |
-| **Read replicas** | Route SELECTs to replicas | Eventual consistency on reads |
-| **Connection pooling** | PgBouncer / RDS Proxy between app and DB | Reduces connection overhead |
-| **Partitioning** | Split one large table by range or hash | Keeps indexes small, complicates queries |
-| **Sharding** | Multiple independent DB instances by tenant/key | Eliminates cross-shard JOINs |
+| Pattern                | How                                             | Trade-off                                |
+| ---------------------- | ----------------------------------------------- | ---------------------------------------- |
+| **Vertical scaling**   | Bigger machine, more RAM                        | Simple but hits ceiling                  |
+| **Read replicas**      | Route SELECTs to replicas                       | Eventual consistency on reads            |
+| **Connection pooling** | PgBouncer / RDS Proxy between app and DB        | Reduces connection overhead              |
+| **Partitioning**       | Split one large table by range or hash          | Keeps indexes small, complicates queries |
+| **Sharding**           | Multiple independent DB instances by tenant/key | Eliminates cross-shard JOINs             |
 
 Most applications should exhaust vertical scaling and read replicas before reaching for sharding — sharding eliminates cross-shard JOINs and complicates transactions significantly.
 
@@ -88,23 +288,23 @@ Most applications should exhaust vertical scaling and read replicas before reach
 
 Indexes are the primary performance lever. Without them, every query does a full table scan.
 
-| Index type | Best for |
-|---|---|
-| **B-tree** (default) | Equality (`=`) and range (`<`, `>`, `BETWEEN`) lookups |
-| **Hash** | Equality-only lookups, slightly faster than B-tree |
-| **GIN / GiST** | Full-text search, JSONB columns, arrays |
-| **Partial index** | Index only rows matching a condition (e.g., `WHERE deleted_at IS NULL`) |
+| Index type           | Best for                                                                |
+| -------------------- | ----------------------------------------------------------------------- |
+| **B-tree** (default) | Equality (`=`) and range (`<`, `>`, `BETWEEN`) lookups                  |
+| **Hash**             | Equality-only lookups, slightly faster than B-tree                      |
+| **GIN / GiST**       | Full-text search, JSONB columns, arrays                                 |
+| **Partial index**    | Index only rows matching a condition (e.g., `WHERE deleted_at IS NULL`) |
 
 Over-indexing slows writes because every index must be updated on INSERT/UPDATE/DELETE.
 
 ## Trade-offs
 
-| | Benefit | Cost |
-|---|---|---|
-| **Consistency** | ACID transactions, no lost writes | Serialization adds latency under high concurrency |
-| **Flexibility** | SQL handles complex queries without code | Schema changes on live tables require migrations |
+|                 | Benefit                                      | Cost                                                     |
+| --------------- | -------------------------------------------- | -------------------------------------------------------- |
+| **Consistency** | ACID transactions, no lost writes            | Serialization adds latency under high concurrency        |
+| **Flexibility** | SQL handles complex queries without code     | Schema changes on live tables require migrations         |
 | **Reliability** | Battle-tested, well-understood failure modes | Single primary is a bottleneck for write-heavy workloads |
-| **Operability** | Managed services handle most ops burden | Still requires tuning indexes and query plans |
+| **Operability** | Managed services handle most ops burden      | Still requires tuning indexes and query plans            |
 
 ## Real-World Usage
 
