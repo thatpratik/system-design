@@ -22,7 +22,7 @@ export function CategoryBadge({ category }: { category: Category }) {
   return (
     <Badge
       variant="outline"
-      className={cn("text-xs font-medium", categoryStyles[category])}
+      className={cn("w-fit text-xs font-medium", categoryStyles[category])}
     >
       {CATEGORY_LABELS[category]}
     </Badge>
