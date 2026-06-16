@@ -13,7 +13,7 @@ interface ContentCardProps {
 }
 
 const categoryAccent: Record<Category, string> = {
-  networking:  "border-l-blue-400",
+  "traffic-management": "border-l-blue-400",
   storage:     "border-l-teal-400",
   messaging:   "border-l-violet-400",
   compute:     "border-l-orange-400",

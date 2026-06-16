@@ -2,7 +2,7 @@ export type Category =
   | "storage"
   | "messaging"
   | "compute"
-  | "networking"
+  | "traffic-management"
   | "coordination"
   | "observability";
 
