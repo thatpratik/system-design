@@ -38,7 +38,7 @@ export default function ComponentsPage() {
               <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
                 {CATEGORY_LABELS[category] ?? category}
               </h2>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {grouped[category].map((component) => (
                   <ContentCard
                     key={component.slug}

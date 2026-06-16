@@ -14,11 +14,11 @@ interface ContentCardProps {
 
 const categoryAccent: Record<Category, string> = {
   "traffic-management": "border-l-blue-400",
-  storage:     "border-l-teal-400",
-  messaging:   "border-l-violet-400",
-  compute:     "border-l-orange-400",
-  coordination:"border-l-amber-400",
-  observability:"border-l-rose-400",
+  storage: "border-l-teal-400",
+  messaging: "border-l-violet-400",
+  compute: "border-l-orange-400",
+  coordination: "border-l-amber-400",
+  observability: "border-l-rose-400",
 };
 
 export function ContentCard({ title, summary, category, href }: ContentCardProps) {
