@@ -27,3 +27,4 @@ bun.lockb
 .DS_Store
 .agents/
 .claude/
+/lib/generated/prisma
