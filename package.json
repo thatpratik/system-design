@@ -37,13 +37,18 @@
     "tailwind-merge": "^2.6.0",
     "zustand": "^5.0.0"
   },
+  "prisma": {
+    "seed": "bun prisma/seed.ts"
+  },
   "overrides": {
     "postcss": "^8.5.15"
   },
   "devDependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
     "@tailwindcss/typography": "^0.5.15",
     "@types/mdx": "^2.0.13",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@typescript-eslint/eslint-plugin": "^8.60.1",
@@ -53,6 +58,7 @@
     "eslint-config-next": "16.2.7",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "pg": "^8.21.0",
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
