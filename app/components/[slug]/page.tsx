@@ -8,6 +8,7 @@ import { CategoryBadge } from "@/components/shared/category-badge";
 import { Separator } from "@/components/ui/separator";
 import { LoadBalancerDiagram } from "@/components/visualizations/load-balancer-diagram";
 import { CacheDiagram } from "@/components/visualizations/cache-diagram";
+import { TldrButton } from "@/components/shared/tldr-button";
 
 const componentVisualizations: Record<string, Record<string, React.ComponentType>> = {
   "load-balancer": { LoadBalancerDiagram },
@@ -67,6 +68,10 @@ export default async function ComponentPage({ params }: Props) {
       </div>
 
       <Separator className="mb-8" />
+
+      <div className="mb-6">
+        <TldrButton slug={slug} type="component" />
+      </div>
 
       {/* MDX body */}
       <MdxContent source={content} components={componentVisualizations[slug]} />

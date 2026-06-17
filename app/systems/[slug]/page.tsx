@@ -7,6 +7,7 @@ import { MdxContent } from "@/components/shared/mdx-content";
 import { CategoryBadge } from "@/components/shared/category-badge";
 import { Separator } from "@/components/ui/separator";
 import { UrlShortenerDiagram } from "@/components/visualizations/url-shortener-diagram";
+import { TldrButton } from "@/components/shared/tldr-button";
 
 const systemVisualizations: Record<string, Record<string, React.ComponentType>> = {
   "url-shortener": { UrlShortenerDiagram },
@@ -64,6 +65,10 @@ export default async function SystemPage({ params }: Props) {
       </div>
 
       <Separator className="mb-8" />
+
+      <div className="mb-6">
+        <TldrButton slug={slug} type="system" />
+      </div>
 
       {/* MDX body */}
       <MdxContent source={content} components={systemVisualizations[slug]} />
