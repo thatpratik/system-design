@@ -17,16 +17,18 @@
 
 ## Contents
 
-- [🚀 Quick Start](#-quick-start)
-- [✨ Features](#-features)
-- [🗺️ Architecture](#️-architecture)
-- [📦 Tech Stack](#-tech-stack)
-- [🧩 Content Model](#-content-model)
-- [🕸️ Knowledge Graph](#️-knowledge-graph)
-- [🧭 User Flows](#-user-flows)
-- [🗂️ Project Structure](#️-project-structure)
-- [➕ Adding Content](#-adding-content)
-- [📄 License](#-license)
+- [System Design](#system-design)
+  - [Contents](#contents)
+  - [🚀 Quick Start](#-quick-start)
+  - [✨ Features](#-features)
+  - [🗺️ Architecture](#️-architecture)
+  - [📦 Tech Stack](#-tech-stack)
+  - [🧩 Content Model](#-content-model)
+  - [🕸️ Knowledge Graph](#️-knowledge-graph)
+  - [🧭 User Flows](#-user-flows)
+  - [🗂️ Project Structure](#️-project-structure)
+  - [➕ Adding Content](#-adding-content)
+  - [📄 License](#-license)
 
 ---
 
@@ -158,7 +160,7 @@ erDiagram
 ```yaml
 title: "URL Shortener"
 slug: "url-shortener"
-category: "networking"        # storage | messaging | compute | networking | coordination | observability
+category: "system"        # storage | messaging | compute | System | coordination | observability
 summary: "One-line description"
 components:
   - "load-balancer"
@@ -316,7 +318,7 @@ types/
 
 ## ➕ Adding Content
 
-Categories: `storage` · `messaging` · `compute` · `networking` · `coordination` · `observability`
+Categories: `storage` · `messaging` · `compute` · `system` · `coordination` · `observability`
 
 <details>
 <summary><strong>Add a new system</strong></summary>

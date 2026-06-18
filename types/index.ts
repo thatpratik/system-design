@@ -4,7 +4,8 @@ export type Category =
   | "compute"
   | "traffic-management"
   | "coordination"
-  | "observability";
+  | "observability"
+  | "system";
 
 export interface ComponentMeta {
   title: string;

@@ -19,6 +19,7 @@ const categoryAccent: Record<Category, string> = {
   compute: "border-l-orange-400",
   coordination: "border-l-amber-400",
   observability: "border-l-rose-400",
+  system: "border-l-green-400",
 };
 
 export function ContentCard({ title, summary, category, href }: ContentCardProps) {

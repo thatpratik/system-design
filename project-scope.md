@@ -80,7 +80,7 @@ Each component includes:
 
 ### Dashboard
 - Navigate between all systems and components
-- Logical grouping by architecture category (e.g. Storage, Messaging, Compute, Networking)
+- Logical grouping by architecture category (e.g. Storage, Messaging, Compute, System)
 - Client-side search across all systems and components
 
 ### Knowledge Graph View

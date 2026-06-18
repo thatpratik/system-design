@@ -7,4 +7,5 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   compute: "Compute",
   coordination: "Coordination",
   observability: "Observability",
+  system: "System",
 };
