@@ -20,9 +20,11 @@
 - [System Design](#system-design)
   - [Contents](#contents)
   - [🚀 Quick Start](#-quick-start)
+    - [Environment variables](#environment-variables)
   - [✨ Features](#-features)
   - [🗺️ Architecture](#️-architecture)
   - [📦 Tech Stack](#-tech-stack)
+  - [| Model | Claude Haiku 4.5 via `@ai-sdk/anthropic` |](#-model--claude-haiku-45-via-ai-sdkanthropic-)
   - [🧩 Content Model](#-content-model)
   - [🕸️ Knowledge Graph](#️-knowledge-graph)
   - [🧭 User Flows](#-user-flows)
@@ -42,6 +44,15 @@ bun start          # serve production build
 bun lint           # ESLint via next lint
 ```
 
+### Environment variables
+
+Create `.env.local` at the project root:
+
+```bash
+DATABASE_URL=postgresql://<user>@localhost:5432/social
+ANTHROPIC_API_KEY=sk-ant-...   # required for AI TLDR feature
+```
+
 ---
 
 ## ✨ Features
@@ -54,12 +65,13 @@ bun lint           # ESLint via next lint
 | 🔍 **Cmd+K Search** | Fuzzy full-text search across all systems and components via Fuse.js |
 | 🕸️ **Knowledge Graph** | D3 force-directed graph visualising every system↔component relationship |
 | 🔗 **Bidirectional Links** | Systems list their components; components list the systems that use them |
+| ✨ **AI TLDR** | On-demand streaming summary for any page, powered by Claude Haiku via Vercel AI SDK |
 
 ---
 
 ## 🗺️ Architecture
 
-> **Note:** All content is read from MDX files at build time — there is no database or CMS.
+> **Note:** Content is read from MDX files at build time. The only runtime server call is the `/api/tldr` route which streams LLM summaries on demand.
 
 ```mermaid
 flowchart TD
@@ -79,14 +91,17 @@ flowchart TD
     content_ts --> components_page["🧩 /components\n/components/[slug]\n/components/compare"]
     content_ts --> search_idx["🔍 Fuse.js\nSearch Index"]
     content_ts --> graph_data["🕸️ D3\nKnowledge Graph"]
+    content_ts --> tldr_api["✨ /api/tldr\nClaude Haiku · streaming"]
 
     classDef file fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
     classDef lib fill:#f3e8ff,stroke:#7c3aed,stroke-width:2px,color:#3b0764
     classDef page fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
+    classDef api fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
 
     class mdx_systems,mdx_components file
     class parser,content_ts lib
     class systems_page,components_page,search_idx,graph_data page
+    class tldr_api api
 ```
 
 ---
@@ -114,7 +129,9 @@ flowchart TD
 | Search state | Zustand |
 | Interactive diagrams | React Flow (`@xyflow/react`) |
 | Knowledge graph | D3.js v7 (force-directed) |
-
+| **AI** | |
+| LLM streaming | Vercel AI SDK v6 (`ai`, `@ai-sdk/react`) |
+| Model | Claude Haiku 4.5 via `@ai-sdk/anthropic` |
 ---
 
 ## 🧩 Content Model
@@ -254,6 +271,9 @@ flowchart TD
     component_detail -->|"Compare →"| compare["/components/compare\nside-by-side: bestFor\nstrengths · weaknesses · notFor"]
     components_list --> compare
 
+    system_detail -->|"AI TLDR"| tldr["✨ /api/tldr\nstreaming 4-bullet summary"]
+    component_detail -->|"AI TLDR"| tldr
+
     search -->|"select result"| system_detail
     search -->|"select result"| component_detail
     graph_page -->|"click node"| system_detail
@@ -262,10 +282,12 @@ flowchart TD
     classDef nav fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
     classDef content fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
     classDef feature fill:#fce7f3,stroke:#db2777,stroke-width:2px,color:#831843
+    classDef ai fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#064e3b
 
     class home,systems_list,components_list nav
     class system_detail,component_detail,compare content
     class search,graph_page feature
+    class tldr ai
 ```
 
 ---
@@ -299,6 +321,7 @@ components/
     content-card.tsx          # Card for listing pages
     comparison-table.tsx      # Side-by-side comparison rows
     compare-selector.tsx      # Dropdown pair → compare URL
+    tldr-button.tsx           # AI TLDR toggle (useCompletion streaming)
   visualizations/
     load-balancer-diagram.tsx # React Flow round-robin animation
     cache-diagram.tsx         # React Flow hit/miss demo
@@ -312,6 +335,14 @@ lib/
 
 types/
   index.ts                    # SystemMeta, ComponentMeta, ExternalLink, GraphNode, GraphEdge
+
+prisma/
+  schema.prisma               # Social platform DB schema (User, Post, Comment, …)
+  seed.ts                     # Dummy data seed (8 users, 20 posts, 15 comments, …)
+  migrations/
+    0001_init/migration.sql   # Baseline migration
+
+prisma.config.ts              # Prisma 7 config — datasource URL + seed command
 ```
 
 ---
