@@ -17,6 +17,10 @@ export default function ComponentsPage() {
     return acc;
   }, {});
 
+  for (const cat of Object.keys(grouped)) {
+    grouped[cat].sort((a, b) => (a.sequence ?? Infinity) - (b.sequence ?? Infinity));
+  }
+
   const categories = Object.keys(grouped) as Category[];
 
   return (

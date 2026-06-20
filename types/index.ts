@@ -12,6 +12,8 @@ export interface ComponentMeta {
   slug: string;
   category: Category;
   summary: string;
+  /** display order within a category — lower numbers appear first */
+  sequence?: number;
   /** slugs of systems that use this component */
   usedIn: string[];
   /** slugs of alternative components for comparison */
