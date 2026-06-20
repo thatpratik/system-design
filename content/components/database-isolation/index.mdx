@@ -1,0 +1,247 @@
+---
+title: "Database Isolation Levels"
+slug: "database-isolation"
+category: "storage"
+summary: "Isolation levels control how much concurrent transactions can see each other's in-progress work — trading correctness guarantees against throughput and latency."
+usedIn: []
+alternatives: []
+externalLinks:
+  - label: "PostgreSQL — Transaction Isolation"
+    url: "https://www.postgresql.org/docs/current/transaction-iso.html"
+  - label: "MySQL — InnoDB Transaction Model"
+    url: "https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-model.html"
+  - label: "SQL Standard (ISO/IEC 9075)"
+    url: "https://www.iso.org/standard/76583.html"
+strengths:
+  - "Serializable isolation eliminates entire classes of concurrency bugs (phantom reads, lost updates)"
+  - "Lower levels (Read Committed) give high throughput with acceptable correctness for most apps"
+  - "MVCC-based isolation (Postgres, InnoDB) allows readers to never block writers"
+  - "Standard SQL levels mean the concepts transfer across database engines"
+weaknesses:
+  - "Stronger isolation increases lock contention and reduces concurrent throughput"
+  - "Serializable isolation can cause transaction aborts that require application-level retry logic"
+  - "Different databases implement the same level name differently (MySQL Repeatable Read vs Postgres Repeatable Read)"
+  - "Choosing the wrong level is a silent bug — incorrect reads don't raise errors"
+bestFor:
+  - "Financial systems where double-spend or double-booking must be impossible"
+  - "Inventory reservation where correctness matters more than throughput"
+  - "Any multi-step business transaction that reads and then writes based on what it read"
+  - "Audit and compliance workloads where reads must be perfectly consistent"
+notFor:
+  - "High-throughput analytics where approximate reads are acceptable (prefer Read Committed)"
+  - "Event-sourced systems where all writes are appends and reads are at a point in time"
+  - "Workloads that can tolerate eventual consistency (consider NoSQL instead)"
+---
+
+## What are Isolation Levels?
+
+Isolation is the "I" in ACID. It defines how much one transaction can see of what another transaction is doing *before it commits*. Without isolation, concurrent transactions can interfere in subtle, hard-to-reproduce ways.
+
+The SQL standard defines four isolation levels, each preventing a specific class of concurrency anomaly. Real databases implement these via **locking** or **MVCC (Multi-Version Concurrency Control)** — Postgres and MySQL InnoDB both use MVCC, which lets readers and writers proceed in parallel without blocking each other.
+
+---
+
+## The Three Anomalies
+
+Understanding what each level prevents requires knowing what can go wrong.
+
+### Dirty Read
+
+A transaction reads a row written by another transaction that **has not yet committed**. If the writer rolls back, the reader has seen data that never officially existed.
+
+```
+T1: UPDATE accounts SET balance = 0 WHERE id = 1;  -- not committed
+T2: SELECT balance FROM accounts WHERE id = 1;      -- sees 0 (dirty)
+T1: ROLLBACK;
+-- T2 acted on a balance that never existed
+```
+
+### Non-Repeatable Read
+
+A transaction reads the same row twice and gets **different values** because another transaction committed a change between the two reads.
+
+```
+T1: SELECT price FROM products WHERE id = 5;  -- sees 100
+T2: UPDATE products SET price = 80 WHERE id = 5; COMMIT;
+T1: SELECT price FROM products WHERE id = 5;  -- now sees 80
+-- T1's two reads disagree within a single transaction
+```
+
+### Phantom Read
+
+A transaction runs the same **range query** twice and gets a **different set of rows** because another transaction inserted or deleted matching rows between the two queries.
+
+```
+T1: SELECT COUNT(*) FROM bookings WHERE flight_id = 42;  -- sees 99
+T2: INSERT INTO bookings (flight_id, user_id) VALUES (42, 7); COMMIT;
+T1: SELECT COUNT(*) FROM bookings WHERE flight_id = 42;  -- sees 100
+-- T1's range query returned different rows
+```
+
+---
+
+## The Four Isolation Levels
+
+| Level | Dirty Read | Non-Repeatable Read | Phantom Read |
+|---|---|---|---|
+| **Read Uncommitted** | Possible | Possible | Possible |
+| **Read Committed** | Prevented | Possible | Possible |
+| **Repeatable Read** | Prevented | Prevented | Possible |
+| **Serializable** | Prevented | Prevented | Prevented |
+
+---
+
+### Read Uncommitted
+
+Transactions can see uncommitted changes from concurrent transactions. This is the weakest level and is almost never used in practice.
+
+**When it makes sense:** Approximate analytics where a few wrong rows don't affect the result and you want maximum throughput.
+
+```sql
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+BEGIN;
+SELECT SUM(revenue) FROM daily_sales;  -- may include uncommitted rows
+COMMIT;
+```
+
+---
+
+### Read Committed
+
+A transaction only sees data **committed before each statement runs**. Each statement gets a fresh snapshot. This prevents dirty reads but not non-repeatable reads — two reads of the same row in the same transaction can disagree.
+
+**Default in:** PostgreSQL, Oracle, SQL Server.
+
+```sql
+-- Session 1
+BEGIN;
+UPDATE products SET stock = 0 WHERE id = 5;
+-- not yet committed
+
+-- Session 2 (Read Committed)
+SELECT stock FROM products WHERE id = 5;
+-- still sees the original value — dirty read prevented
+
+-- Session 1
+COMMIT;
+
+-- Session 2 reads again
+SELECT stock FROM products WHERE id = 5;
+-- now sees 0 — the committed value
+```
+
+Most application code works correctly at Read Committed. The non-repeatable read anomaly only matters if your transaction reads the same data twice and relies on it being identical.
+
+---
+
+### Repeatable Read
+
+A transaction takes a **consistent snapshot at its start** and sees that snapshot for the entire transaction, regardless of what other transactions commit during that time. Prevents dirty and non-repeatable reads.
+
+**Default in:** MySQL InnoDB.
+
+```sql
+-- Session 1
+BEGIN;
+SELECT balance FROM accounts WHERE id = 1;  -- sees 1000
+
+-- Session 2 commits:
+UPDATE accounts SET balance = 500 WHERE id = 1;
+
+-- Session 1 again (Repeatable Read)
+SELECT balance FROM accounts WHERE id = 1;  -- still sees 1000 (snapshot)
+COMMIT;
+```
+
+> **MySQL vs PostgreSQL:** MySQL's Repeatable Read also prevents most phantom reads via gap locks. PostgreSQL's Repeatable Read does not prevent phantoms — use Serializable for that in Postgres.
+
+---
+
+### Serializable
+
+The strongest level. Transactions are guaranteed to produce the same result as if they had executed **one at a time in some serial order**. Implemented via predicate locks (traditional) or **Serializable Snapshot Isolation (SSI)** in PostgreSQL.
+
+Under SSI, instead of blocking, Postgres detects that two concurrent transactions have a dependency cycle and aborts one with a serialization error — requiring a retry.
+
+```sql
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+-- Session 1
+BEGIN;
+SELECT COUNT(*) FROM bookings WHERE flight_id = 42;  -- 99 booked, 1 seat left
+INSERT INTO bookings (flight_id, user_id) VALUES (42, 7);
+COMMIT;
+
+-- Session 2 concurrently tries the same thing:
+BEGIN;
+SELECT COUNT(*) FROM bookings WHERE flight_id = 42;  -- also sees 99
+INSERT INTO bookings (flight_id, user_id) VALUES (42, 8);
+COMMIT;
+-- ERROR: could not serialize access due to concurrent update
+-- Application must retry — one booking goes through, the other doesn't
+```
+
+Application code using Serializable **must handle serialization errors with retries.**
+
+```python
+for attempt in range(MAX_RETRIES):
+    try:
+        with db.transaction(isolation="serializable"):
+            count = db.query("SELECT COUNT(*) FROM bookings WHERE flight_id = ?", flight_id)
+            if count < capacity:
+                db.execute("INSERT INTO bookings ...", ...)
+        break
+    except SerializationError:
+        if attempt == MAX_RETRIES - 1:
+            raise
+        time.sleep(backoff(attempt))
+```
+
+---
+
+## Choosing the Right Level
+
+```
+Start here: Read Committed
+     │
+     ├── Multi-step logic reads then writes based on the same data?
+     │   └── Yes → Repeatable Read
+     │
+     └── Correctness is critical AND you can handle retries?
+         └── Yes → Serializable
+```
+
+| Scenario | Recommended Level |
+|---|---|
+| Typical web app CRUD | Read Committed |
+| Report that reads multiple related rows | Repeatable Read |
+| Bank transfer, inventory reservation | Serializable |
+| Background analytics job | Read Committed (or lower) |
+| Session variable / temp table usage | Read Committed (avoid Serializable — poor fit) |
+
+---
+
+## MVCC vs Lock-Based Isolation
+
+Most modern databases use **MVCC** rather than shared read locks.
+
+| Approach | How it works | Trade-off |
+|---|---|---|
+| **Lock-based** | Writers hold locks; readers block until the lock is released | Simple but readers block writers |
+| **MVCC** | Each transaction sees a snapshot; old row versions are kept in an undo log | Readers never block writers, but garbage collection of old versions adds overhead |
+
+PostgreSQL, MySQL InnoDB, Oracle, and CockroachDB all use MVCC. SQL Server uses MVCC only when snapshot isolation is enabled.
+
+---
+
+## Common Pitfalls
+
+**Assuming isolation level guarantees more than it does.** Read Committed prevents dirty reads, but two reads of the same row *within the same transaction* can return different values. If your code relies on them being equal, use Repeatable Read.
+
+**Ignoring serialization errors.** Serializable isolation is only correct if your application actually retries on abort. Using Serializable without retry logic is worse than using a lower level — your transaction will silently fail.
+
+**Mixing levels within a system.** Long-running background jobs at Repeatable Read hold old row versions open, causing table bloat in PostgreSQL (`VACUUM` can't reclaim them). Monitor `pg_stat_activity` for long-running transactions.
+
+---
+
+Isolation levels are a property of the [RDBMS](/components/rdbms) transaction model. For a broader view of when to choose a relational database at all, see [Picking the Right Database](/components/picking-the-right-database).

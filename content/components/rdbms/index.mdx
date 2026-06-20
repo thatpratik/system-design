@@ -92,65 +92,11 @@ Once a transaction commits, its changes survive crashes, power loss, and restart
 
 ## Isolation Levels
 
-Isolation is a spectrum. Stronger isolation eliminates more concurrency bugs but reduces throughput because transactions block each other more. SQL standard defines four levels:
+Isolation is a spectrum. The SQL standard defines four levels — from Read Uncommitted (anything goes) to Serializable (perfect correctness, at a throughput cost). The right choice depends on your workload.
 
-| Level | Dirty Read | Non-repeatable Read | Phantom Read |
-|---|---|---|---|
-| **Read Uncommitted** | Possible | Possible | Possible |
-| **Read Committed** | Prevented | Possible | Possible |
-| **Repeatable Read** | Prevented | Prevented | Possible |
-| **Serializable** | Prevented | Prevented | Prevented |
+**Quick rule of thumb:** start at Read Committed (Postgres default), move to Repeatable Read if multi-step logic needs a stable snapshot, use Serializable for critical sections like checkout or inventory reservation.
 
-**Dirty Read** — reading a row written by a transaction that hasn't committed yet. If that transaction rolls back, you read data that never existed.
-
-**Non-repeatable Read** — reading the same row twice in one transaction and getting different values because another transaction committed a change between your two reads.
-
-**Phantom Read** — running the same range query twice and getting a different set of rows because another transaction inserted or deleted rows in between.
-
-### Level-by-level breakdown
-
-**Read Uncommitted** — transactions can see uncommitted changes from other transactions. Almost never used. The only sensible case is approximate analytics where a few wrong rows don't matter and you want maximum throughput.
-
-**Read Committed** (default in PostgreSQL, Oracle, SQL Server) — a transaction only sees data that was committed before each individual statement ran. Prevents dirty reads. Most application code works correctly at this level.
-
-```sql
--- Session 1
-BEGIN;
-UPDATE products SET stock = 0 WHERE id = 5;
--- not yet committed
-
--- Session 2 (Read Committed)
-SELECT stock FROM products WHERE id = 5;
--- still sees the old value — dirty read prevented
-```
-
-**Repeatable Read** (default in MySQL InnoDB) — a transaction takes a snapshot of the database at its start and sees that snapshot consistently for the entire transaction, even if other transactions commit changes during that time. Prevents dirty and non-repeatable reads.
-
-```sql
--- Session 1
-BEGIN;
-SELECT balance FROM accounts WHERE id = 1;  -- sees 1000
-
--- Session 2 commits: UPDATE accounts SET balance = 500 WHERE id = 1;
-
--- Session 1 again (Repeatable Read)
-SELECT balance FROM accounts WHERE id = 1;  -- still sees 1000 (snapshot)
-COMMIT;
-```
-
-**Serializable** — the strongest level. Transactions are guaranteed to produce the same result as if they had executed one at a time in some serial order. Implemented via predicate locks or optimistic concurrency (Serializable Snapshot Isolation in PostgreSQL). Use for financial reconciliation, inventory reservation, or any logic where correctness is paramount.
-
-```sql
-SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
-BEGIN;
-SELECT COUNT(*) FROM bookings WHERE flight_id = 42;  -- 99 booked, 1 seat left
-INSERT INTO bookings (flight_id, user_id) VALUES (42, 7);
-COMMIT;
--- If another transaction concurrently does the same, one will get a serialization error
--- and must retry — no double booking is possible
-```
-
-**Practical guidance:** Start at Read Committed. Move to Repeatable Read if you see non-repeatable read bugs in multi-step business logic. Use Serializable only for critical sections (checkout, reservation) where you'd otherwise need application-level locking.
+For the full breakdown — dirty reads, phantom reads, MVCC vs locking, retry patterns, and per-level SQL examples — see [Database Isolation Levels](/components/database-isolation).
 
 ---
 
