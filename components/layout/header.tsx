@@ -67,15 +67,15 @@ export function Header() {
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => openSearch(true)}
-            className="hidden md:flex items-center gap-2 h-8 rounded-lg border border-border/60 bg-secondary/60 px-3 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground hover:border-border transition-all group"
+            className="hidden md:flex items-center gap-1.5 h-8 rounded-lg border border-border/60 bg-secondary/60 px-2 text-muted-foreground hover:bg-secondary hover:text-foreground hover:border-border transition-all"
+            aria-label="Open search"
           >
             <Search className="h-3.5 w-3.5 shrink-0" />
-            <span className="text-xs">Search…</span>
-            <span className="ml-3 flex items-center gap-0.5">
-              <kbd className="rounded border border-border/60 bg-card px-1 py-0.5 text-[9px] font-mono shadow-[0_1px_0_hsl(var(--border))]">
+            <span className="flex items-center gap-0.5">
+              <kbd className="rounded border border-border/60 bg-card px-1.5 py-0.5 text-[10px] font-mono shadow-[0_1px_0_hsl(var(--border))]">
                 ⌘
               </kbd>
-              <kbd className="rounded border border-border/60 bg-card px-1 py-0.5 text-[9px] font-mono shadow-[0_1px_0_hsl(var(--border))]">
+              <kbd className="rounded border border-border/60 bg-card px-1.5 py-0.5 text-[10px] font-mono shadow-[0_1px_0_hsl(var(--border))]">
                 K
               </kbd>
             </span>
