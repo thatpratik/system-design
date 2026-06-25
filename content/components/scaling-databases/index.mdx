@@ -90,6 +90,20 @@ A **connection pooler** sits between the application and the database, multiplex
 
 ---
 
+## Horizontal Scaling
+
+Where vertical scaling makes one machine bigger, horizontal scaling adds more machines to share the load. The database is no longer a single node — work is distributed across multiple instances.
+
+**What it fixes:** Vertical scaling hits a hard ceiling (the largest available machine). Horizontal scaling has no equivalent ceiling: you can keep adding replicas, cache nodes, or shards as demand grows. It is the correct approach once vertical scaling stops being cost-effective or reaches its physical limit.
+
+**How it works:** Reads and writes are split. Reads are fanned out across replicas or served from a cache. Writes are either funnelled through a single primary (Levels 3–5) or partitioned across multiple primaries via sharding (Level 6).
+
+**The trade-off horizontal scaling always introduces:** Consistency. A single machine is trivially consistent. Distributing state means replicas may lag behind the primary, caches may hold stale data, and shards cannot easily answer queries that span multiple partitions. Every horizontal technique in Levels 3–6 is a point on the consistency-vs-scalability spectrum — choose based on what your application can tolerate.
+
+**When to apply:** After connection pooling (Level 2) is in place and vertical scaling (Level 1) is no longer cost-effective or is approaching its limit.
+
+---
+
 ## Level 3 — Read Replicas
 
 The primary handles all writes. Replicas receive a stream of changes (WAL in PostgreSQL, binlog in MySQL) and apply them asynchronously, staying nearly in sync.

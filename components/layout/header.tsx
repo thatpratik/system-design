@@ -90,6 +90,7 @@ export function Header() {
             aria-label="Open search"
           >
             <Search className="h-3.5 w-3.5 shrink-0" />
+            <label className="text-sm leading-none">Search</label>
             <span className="flex items-center gap-0.5">
               <kbd className="rounded border border-border/60 bg-card px-1.5 py-0.5 text-[10px] font-mono shadow-[0_1px_0_hsl(var(--border))]">
                 ⌘
