@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, Network, Search } from "lucide-react";
+import { Menu, Moon, Network, Search, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -21,6 +22,24 @@ const navLinks = [
   { href: "/systems", label: "Systems" },
   { href: "/graph", label: "Graph" },
 ];
+
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return <div className="h-8 w-8" />;
+
+  return (
+    <button
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+      className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+      aria-label="Toggle theme"
+    >
+      {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  );
+}
 
 export function Header() {
   const pathname = usePathname();
@@ -63,7 +82,7 @@ export function Header() {
           })}
         </nav>
 
-        {/* Search trigger */}
+        {/* Search + theme */}
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => openSearch(true)}
@@ -88,6 +107,8 @@ export function Header() {
             <Search className="h-4 w-4" />
             <span className="sr-only">Search</span>
           </button>
+
+          <ThemeToggle />
         </div>
 
         {/* Mobile hamburger */}

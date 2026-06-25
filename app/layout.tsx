@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { Header } from "@/components/layout/header";
+import { ThemeProvider } from "@/components/layout/theme-provider";
 import { SearchCommand } from "@/components/shared/search-command";
 import { buildSearchIndex } from "@/lib/content";
 import "./globals.css";
@@ -27,13 +28,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const searchIndex = buildSearchIndex();
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} antialiased`}
       >
-        <Header />
-        <SearchCommand entries={searchIndex} />
-        <main>{children}</main>
+        <ThemeProvider>
+          <Header />
+          <SearchCommand entries={searchIndex} />
+          <main>{children}</main>
+        </ThemeProvider>
       </body>
     </html>
   );
