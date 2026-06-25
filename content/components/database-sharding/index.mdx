@@ -125,12 +125,12 @@ CREATE TABLE events_1 PARTITION OF events FOR VALUES WITH (MODULUS 8, REMAINDER 
 
 ### Benefits of Partitioning
 
-| Benefit | How |
-|---|---|
-| **Query performance** | Partition pruning skips irrelevant data; smaller indexes per partition |
-| **Maintenance** | `VACUUM`, `ANALYZE`, index rebuilds run per-partition, not the whole table |
-| **Data lifecycle** | Drop an entire partition (instant) instead of `DELETE` rows (slow, bloats WAL) |
-| **Parallel query** | Database can scan partitions in parallel on multi-core machines |
+| Benefit               | How                                                                            |
+| --------------------- | ------------------------------------------------------------------------------ |
+| **Query performance** | Partition pruning skips irrelevant data; smaller indexes per partition         |
+| **Maintenance**       | `VACUUM`, `ANALYZE`, index rebuilds run per-partition, not the whole table     |
+| **Data lifecycle**    | Drop an entire partition (instant) instead of `DELETE` rows (slow, bloats WAL) |
+| **Parallel query**    | Database can scan partitions in parallel on multi-core machines                |
 
 ```sql
 -- Dropping a month of data: instant, no WAL bloat
@@ -219,23 +219,25 @@ Used by Cassandra, DynamoDB, and Redis Cluster. The preferred approach when the 
 
 The shard key is the most consequential decision in a sharding design.
 
-| Goal | Guidance |
-|---|---|
-| **Even distribution** | Use high-cardinality keys (UUID, user ID). Avoid low-cardinality keys like `country` or `status`. |
-| **Query locality** | Key should match the most common `WHERE` clause. Always querying by `user_id`? Shard on `user_id`. |
+| Goal                     | Guidance                                                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **Even distribution**    | Use high-cardinality keys (UUID, user ID). Avoid low-cardinality keys like `country` or `status`.         |
+| **Query locality**       | Key should match the most common `WHERE` clause. Always querying by `user_id`? Shard on `user_id`.        |
 | **Avoid monotonic keys** | Auto-increment IDs and timestamps make the last shard a write hot spot. Use UUID v4 or add a hash prefix. |
-| **Tenant isolation** | In multi-tenant SaaS, shard on `tenant_id` — all tenant data colocates, queries never cross shards. |
+| **Tenant isolation**     | In multi-tenant SaaS, shard on `tenant_id` — all tenant data colocates, queries never cross shards.       |
 
 ### Hot Shards and Rebalancing
 
 **Hot shards** receive disproportionate traffic because the shard key maps popular data to one instance.
 
 Mitigations:
+
 - **Sub-sharding**: split the hot shard into smaller shards.
 - **Compound key**: append a random suffix (`user_id + suffix`) to spread writes, then aggregate on read.
 - **Caching**: absorb reads in front of the hot shard.
 
 **Rebalancing** when a shard fills up:
+
 1. Identify the target distribution.
 2. Copy rows to the new shard in batches (online migration).
 3. Make the old shard read-only during the final cutover window.
@@ -283,26 +285,26 @@ A transaction touching two shards cannot use a local `COMMIT`. It requires two-p
 
 ## Partitioning vs Sharding — When to Use Each
 
-| Scenario | Approach |
-|---|---|
-| Table has grown past 100M rows and queries are slow | Partition by range or hash |
-| Need to archive/expire old data quickly | Partition by time — drop old partitions |
-| Write throughput has saturated the primary | Shard — add instances |
-| Multi-tenant SaaS, tenant data must be isolated | Shard by tenant |
-| Working set fits in RAM, reads are the problem | Read replicas (not sharding) |
-| Don't know which to pick | Partition first; shard if writes become the bottleneck |
+| Scenario                                            | Approach                                               |
+| --------------------------------------------------- | ------------------------------------------------------ |
+| Table has grown past 100M rows and queries are slow | Partition by range or hash                             |
+| Need to archive/expire old data quickly             | Partition by time — drop old partitions                |
+| Write throughput has saturated the primary          | Shard — add instances                                  |
+| Multi-tenant SaaS, tenant data must be isolated     | Shard by tenant                                        |
+| Working set fits in RAM, reads are the problem      | Read replicas (not sharding)                           |
+| Don't know which to pick                            | Partition first; shard if writes become the bottleneck |
 
 ---
 
 ## Trade-offs
 
-| | Partitioning | Sharding |
-|---|---|---|
-| **Write scale** | No — still one primary | Yes — linear with instance count |
-| **Application change** | None — transparent to the app | Yes — routing logic required |
-| **Cross-entity queries** | Full support within the DB | Scatter-gather across instances |
-| **Operational cost** | Low — same DB cluster | High — N independent clusters |
-| **Data lifecycle** | Instant partition drop | Must migrate data between instances |
+|                          | Partitioning                  | Sharding                            |
+| ------------------------ | ----------------------------- | ----------------------------------- |
+| **Write scale**          | No — still one primary        | Yes — linear with instance count    |
+| **Application change**   | None — transparent to the app | Yes — routing logic required        |
+| **Cross-entity queries** | Full support within the DB    | Scatter-gather across instances     |
+| **Operational cost**     | Low — same DB cluster         | High — N independent clusters       |
+| **Data lifecycle**       | Instant partition drop        | Must migrate data between instances |
 
 ---
 

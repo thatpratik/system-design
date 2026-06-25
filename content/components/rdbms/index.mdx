@@ -55,12 +55,14 @@ ACID is what separates an RDBMS from simpler data stores. Each property addresse
 A transaction is an all-or-nothing unit. Either every statement in it commits, or none of them do. There is no in-between state visible to anyone.
 
 **Example — bank transfer:**
+
 ```sql
 BEGIN;
   UPDATE accounts SET balance = balance - 500 WHERE id = 1;
   UPDATE accounts SET balance = balance + 500 WHERE id = 2;
 COMMIT;
 ```
+
 If the database crashes between the two `UPDATE`s, neither change is applied when the server restarts. The `ROLLBACK` happens automatically. You will never end up with money deducted from account 1 but not credited to account 2.
 
 ### Consistency
@@ -123,13 +125,13 @@ CREATE TABLE orders (
 CREATE UNIQUE INDEX ON subscriptions (user_id) WHERE status = 'active';
 ```
 
-| Constraint type | What it enforces |
-|---|---|
-| `PRIMARY KEY` | Uniqueness + not null on identifier column |
-| `FOREIGN KEY` | Referenced row must exist in parent table |
-| `NOT NULL` | Column must always have a value |
-| `UNIQUE` | No two rows share the same value(s) |
-| `CHECK` | Value must satisfy an arbitrary boolean expression |
+| Constraint type | What it enforces                                   |
+| --------------- | -------------------------------------------------- |
+| `PRIMARY KEY`   | Uniqueness + not null on identifier column         |
+| `FOREIGN KEY`   | Referenced row must exist in parent table          |
+| `NOT NULL`      | Column must always have a value                    |
+| `UNIQUE`        | No two rows share the same value(s)                |
+| `CHECK`         | Value must satisfy an arbitrary boolean expression |
 
 Constraints fail fast at the database layer, not silently in application code. A violated constraint raises an error immediately and rolls back the statement.
 
@@ -149,12 +151,12 @@ DELETE FROM orders WHERE id = 101;
 -- → all order_items with order_id = 101 are deleted atomically
 ```
 
-| Option | Behaviour |
-|---|---|
-| `ON DELETE CASCADE` | Delete child rows when parent is deleted |
+| Option               | Behaviour                                    |
+| -------------------- | -------------------------------------------- |
+| `ON DELETE CASCADE`  | Delete child rows when parent is deleted     |
 | `ON DELETE SET NULL` | Set FK column to NULL when parent is deleted |
-| `ON DELETE RESTRICT` | Block deletion if children exist (default) |
-| `ON UPDATE CASCADE` | Update FK column when parent PK changes |
+| `ON DELETE RESTRICT` | Block deletion if children exist (default)   |
+| `ON UPDATE CASCADE`  | Update FK column when parent PK changes      |
 
 **Use cascade carefully.** A single `DELETE` on a parent can silently remove thousands of child rows across multiple tables. Always verify cascade chains with an `EXPLAIN` or a dry run before enabling in production.
 
@@ -197,11 +199,11 @@ AFTER UPDATE ON products
 FOR EACH ROW EXECUTE FUNCTION log_price_change();
 ```
 
-| Trigger timing | When it runs |
-|---|---|
-| `BEFORE` | Before the row is written — can modify or reject the change |
-| `AFTER` | After the row is written — used for side effects (audit logs, notifications) |
-| `INSTEAD OF` | On views — replaces the default write behaviour |
+| Trigger timing | When it runs                                                                 |
+| -------------- | ---------------------------------------------------------------------------- |
+| `BEFORE`       | Before the row is written — can modify or reject the change                  |
+| `AFTER`        | After the row is written — used for side effects (audit logs, notifications) |
+| `INSTEAD OF`   | On views — replaces the default write behaviour                              |
 
 **Trigger trade-offs:** Triggers are powerful but invisible to the application — a developer reading the code won't know a trigger fires. Keep triggers narrow (audit logging, hard invariants), not as a place for business logic that belongs in the application layer.
 
