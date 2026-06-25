@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTheme } from "next-themes";
 import {
   ReactFlow,
   Background,
@@ -12,7 +13,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-const ROLE = {
+const ROLE_LIGHT = {
   client:  { border: "#60a5fa", bg: "#eff6ff", text: "#1d4ed8" },
   infra:   { border: "#fbbf24", bg: "#fffbeb", text: "#92400e" },
   server:  { border: "#818cf8", bg: "#eef2ff", text: "#3730a3" },
@@ -21,20 +22,28 @@ const ROLE = {
   cache:   { border: "#fb923c", bg: "#fff7ed", text: "#9a3412" },
 } as const;
 
-type Role = keyof typeof ROLE;
+const ROLE_DARK = {
+  client:  { border: "#60a5fa", bg: "#0f2544", text: "#93c5fd" },
+  infra:   { border: "#fbbf24", bg: "#2d1d04", text: "#fcd34d" },
+  server:  { border: "#818cf8", bg: "#1a1240", text: "#a5b4fc" },
+  storage: { border: "#34d399", bg: "#04261c", text: "#6ee7b7" },
+  service: { border: "#c084fc", bg: "#230943", text: "#d8b4fe" },
+  cache:   { border: "#fb923c", bg: "#2d1105", text: "#fdba74" },
+} as const;
+
+type Role = keyof typeof ROLE_LIGHT;
 
 function FeedNode({ data }: NodeProps) {
-  const d = data as { label: string; sublabel?: string; role: Role };
-  const c = ROLE[d.role];
+  const d = data as { label: string; sublabel?: string; border: string; bg: string; text: string };
   return (
     <div
       className="px-3 py-2.5 rounded-xl border-2 shadow-sm min-w-[130px] select-none text-center"
-      style={{ borderColor: c.border, backgroundColor: c.bg }}
+      style={{ borderColor: d.border, backgroundColor: d.bg }}
     >
       <Handle type="target" position={Position.Top} className="!w-2 !h-2 !bg-slate-400 !border-0" />
-      <p className="text-xs font-semibold leading-tight" style={{ color: c.text }}>{d.label}</p>
+      <p className="text-xs font-semibold leading-tight" style={{ color: d.text }}>{d.label}</p>
       {d.sublabel && (
-        <p className="text-[10px] leading-tight mt-0.5" style={{ color: c.text, opacity: 0.6 }}>{d.sublabel}</p>
+        <p className="text-[10px] leading-tight mt-0.5" style={{ color: d.text, opacity: 0.7 }}>{d.sublabel}</p>
       )}
       <Handle type="source" position={Position.Bottom} className="!w-2 !h-2 !bg-slate-400 !border-0" />
     </div>
@@ -50,68 +59,28 @@ const EDGE_DEFAULTS = {
 };
 
 export function FacebookFeedGraph() {
-  const nodes = useMemo(() => [
-    {
-      id: "client",
-      type: "feed",
-      position: { x: 200, y: 0 },
-      data: { label: "Client", role: "client" as Role },
-    },
-    {
-      id: "lb",
-      type: "feed",
-      position: { x: 200, y: 74 },
-      data: { label: "Load Balancer", sublabel: "health checks · routing", role: "infra" as Role },
-    },
-    {
-      id: "ws",
-      type: "feed",
-      position: { x: 200, y: 152 },
-      data: { label: "Web Server", role: "server" as Role },
-    },
-    {
-      id: "db",
-      type: "feed",
-      position: { x: 10, y: 248 },
-      data: { label: "Database", sublabel: "posts · users · graph", role: "storage" as Role },
-    },
-    {
-      id: "agg",
-      type: "feed",
-      position: { x: 200, y: 248 },
-      data: { label: "Aggregator", sublabel: "collects followed posts", role: "service" as Role },
-    },
-    {
-      id: "fg",
-      type: "feed",
-      position: { x: 200, y: 334 },
-      data: { label: "Feed Generator", sublabel: "pre-computes ranked feed", role: "service" as Role },
-    },
-    {
-      id: "post",
-      type: "feed",
-      position: { x: 60, y: 422 },
-      data: { label: "Post Service", role: "service" as Role },
-    },
-    {
-      id: "followers",
-      type: "feed",
-      position: { x: 340, y: 422 },
-      data: { label: "Followers Service", role: "service" as Role },
-    },
-    {
-      id: "ranker",
-      type: "feed",
-      position: { x: 200, y: 508 },
-      data: { label: "Ranker / Merger", role: "service" as Role },
-    },
-    {
-      id: "cache",
-      type: "feed",
-      position: { x: 200, y: 588 },
-      data: { label: "Feed Cache", sublabel: "Redis", role: "cache" as Role },
-    },
-  ], []);
+  const { resolvedTheme } = useTheme();
+  const R = resolvedTheme === "dark" ? ROLE_DARK : ROLE_LIGHT;
+
+  const nodes = useMemo(() => {
+    const n = (id: string, role: Role, label: string, sublabel?: string, x = 200, y = 0) => ({
+      id, type: "feed", position: { x, y },
+      data: { label, sublabel, ...R[role] },
+    });
+    return [
+      n("client",    "client",  "Client",           undefined,                     200, 0),
+      n("lb",        "infra",   "Load Balancer",    "health checks · routing",     200, 74),
+      n("ws",        "server",  "Web Server",       undefined,                     200, 152),
+      n("db",        "storage", "Database",         "posts · users · graph",       10,  248),
+      n("agg",       "service", "Aggregator",       "collects followed posts",      200, 248),
+      n("fg",        "service", "Feed Generator",   "pre-computes ranked feed",     200, 334),
+      n("post",      "service", "Post Service",     undefined,                     60,  422),
+      n("followers", "service", "Followers Service",undefined,                     340, 422),
+      n("ranker",    "service", "Ranker / Merger",  undefined,                     200, 508),
+      n("cache",     "cache",   "Feed Cache",       "Redis",                       200, 588),
+    ];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedTheme]);
 
   const edges = useMemo(() => [
     { id: "c-lb",    source: "client",    target: "lb",        ...EDGE_DEFAULTS },
@@ -127,7 +96,7 @@ export function FacebookFeedGraph() {
   ], []);
 
   return (
-    <div className="rounded-xl border bg-slate-50 overflow-hidden" style={{ height: 668 }}>
+    <div className="rounded-xl border bg-background overflow-hidden" style={{ height: 668 }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -141,7 +110,7 @@ export function FacebookFeedGraph() {
         panOnDrag={false}
         preventScrolling={false}
       >
-        <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#e2e8f0" />
+        <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="hsl(var(--border))" />
       </ReactFlow>
     </div>
   );

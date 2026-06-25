@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef } from "react";
+import { useTheme } from "next-themes";
 import {
   ReactFlow,
   Background,
@@ -79,7 +80,7 @@ function ServerNode({ data }: NodeProps) {
         <span
           className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full"
           style={{
-            backgroundColor: d.active ? `${d.borderColor}30` : "#f1f5f9",
+            backgroundColor: d.active ? `${d.borderColor}30` : "hsl(var(--muted))",
             color: d.textColor,
           }}
         >
@@ -95,15 +96,25 @@ const nodeTypes = { header: HeaderNode, server: ServerNode };
 
 // ── Per-server color palette ──────────────────────────────────────────────────
 
-const SERVER_PALETTE = [
+const SERVER_PALETTE_LIGHT = [
   { borderColor: "#34d399", textColor: "#065f46" },
   { borderColor: "#60a5fa", textColor: "#1e3a8a" },
   { borderColor: "#c084fc", textColor: "#581c87" },
 ];
 
+const SERVER_PALETTE_DARK = [
+  { borderColor: "#34d399", textColor: "#6ee7b7" },
+  { borderColor: "#60a5fa", textColor: "#93c5fd" },
+  { borderColor: "#c084fc", textColor: "#d8b4fe" },
+];
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function LoadBalancerDiagram() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  const SERVER_PALETTE = isDark ? SERVER_PALETTE_DARK : SERVER_PALETTE_LIGHT;
+
   const [algorithm, setAlgorithm] = useState<Algorithm>("round-robin");
   const [phase, setPhase] = useState<Phase>("idle");
   const [activeServer, setActiveServer] = useState<number>(-1);
@@ -158,8 +169,8 @@ export function LoadBalancerDiagram() {
           label: "Client",
           sublabel: "HTTP Request",
           borderColor: "#60a5fa",
-          bgColor: "#eff6ff",
-          textColor: "#1d4ed8",
+          bgColor: isDark ? "#0f2544" : "#eff6ff",
+          textColor: isDark ? "#93c5fd" : "#1d4ed8",
         },
       },
       {
@@ -176,8 +187,8 @@ export function LoadBalancerDiagram() {
               ? "Least Connections"
               : "IP Hash",
           borderColor: "#fbbf24",
-          bgColor: "#fffbeb",
-          textColor: "#b45309",
+          bgColor: isDark ? "#2d1d04" : "#fffbeb",
+          textColor: isDark ? "#fcd34d" : "#b45309",
         },
       },
       ...([0, 1, 2] as const).map((i) => ({
@@ -236,9 +247,9 @@ export function LoadBalancerDiagram() {
   ];
 
   return (
-    <div className="not-prose my-8 rounded-xl border bg-slate-50 overflow-hidden">
+    <div className="not-prose my-8 rounded-xl border bg-background overflow-hidden">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b bg-card">
         <div className="flex items-center gap-1">
           {algorithms.map(({ value, label }) => (
             <button
@@ -272,7 +283,7 @@ export function LoadBalancerDiagram() {
           <button
             onClick={sendRequest}
             disabled={phase !== "idle"}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 dark:hover:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ArrowRight className="h-3 w-3" />
             Send Request
@@ -281,7 +292,7 @@ export function LoadBalancerDiagram() {
       </div>
 
       {/* Status */}
-      <div className="px-4 py-2 text-[11px] text-muted-foreground bg-white border-b font-mono">
+      <div className="px-4 py-2 text-[11px] text-muted-foreground bg-card border-b font-mono">
         {statusText}
       </div>
 
@@ -300,7 +311,7 @@ export function LoadBalancerDiagram() {
           panOnDrag={false}
           preventScrolling={false}
         >
-          <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#e2e8f0" />
+          <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="hsl(var(--border))" />
         </ReactFlow>
       </div>
     </div>

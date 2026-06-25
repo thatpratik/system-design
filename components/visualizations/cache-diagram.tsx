@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { useTheme } from "next-themes";
 import {
   ReactFlow,
   Background,
@@ -77,67 +78,59 @@ const nodeTypes = { cacheNode: CacheFlowNode };
 
 // ── Phase → node appearance maps ─────────────────────────────────────────────
 
-function getCacheNodeData(phase: Phase, icon: typeof Monitor, label: string, sublabel: string, variant: "client" | "cache" | "db") {
+function getCacheNodeData(phase: Phase, icon: typeof Monitor, label: string, sublabel: string, variant: "client" | "cache" | "db", isDark: boolean) {
   if (variant === "client") {
     const active = ["checking", "hit"].includes(phase);
     return {
-      icon,
-      label,
-      sublabel,
+      icon, label, sublabel, glow: active,
       borderColor: active ? "#60a5fa" : "#93c5fd",
-      bgColor: "#eff6ff",
-      textColor: "#1d4ed8",
+      bgColor: isDark ? "#0f2544" : "#eff6ff",
+      textColor: isDark ? "#93c5fd" : "#1d4ed8",
       badge: phase === "hit" ? "200 OK" : undefined,
-      badgeTextColor: "#15803d",
-      badgeBgColor: "#dcfce7",
-      glow: active,
+      badgeTextColor: isDark ? "#4ade80" : "#15803d",
+      badgeBgColor: isDark ? "#052e16" : "#dcfce7",
     };
   }
 
   if (variant === "cache") {
-    const map: Record<Phase, { border: string; bg: string; text: string; badge?: string }> = {
-      idle:         { border: "#fb923c", bg: "#fff7ed", text: "#c2410c" },
-      checking:     { border: "#fb923c", bg: "#fff7ed", text: "#c2410c" },
-      hit:          { border: "#22c55e", bg: "#f0fdf4", text: "#15803d", badge: "HIT" },
-      miss:         { border: "#ef4444", bg: "#fef2f2", text: "#b91c1c", badge: "MISS" },
-      "fetching-db":{ border: "#ef4444", bg: "#fef2f2", text: "#b91c1c", badge: "MISS" },
-      populating:   { border: "#60a5fa", bg: "#eff6ff", text: "#1d4ed8", badge: "WARM" },
+    const map: Record<Phase, { border: string; bg: string; bgDark: string; text: string; textDark: string; badge?: string }> = {
+      idle:          { border: "#fb923c", bg: "#fff7ed", bgDark: "#2d1105", text: "#c2410c", textDark: "#fdba74" },
+      checking:      { border: "#fb923c", bg: "#fff7ed", bgDark: "#2d1105", text: "#c2410c", textDark: "#fdba74" },
+      hit:           { border: "#22c55e", bg: "#f0fdf4", bgDark: "#052e16", text: "#15803d", textDark: "#4ade80", badge: "HIT" },
+      miss:          { border: "#ef4444", bg: "#fef2f2", bgDark: "#2a0a0a", text: "#b91c1c", textDark: "#f87171", badge: "MISS" },
+      "fetching-db": { border: "#ef4444", bg: "#fef2f2", bgDark: "#2a0a0a", text: "#b91c1c", textDark: "#f87171", badge: "MISS" },
+      populating:    { border: "#60a5fa", bg: "#eff6ff", bgDark: "#0f2544", text: "#1d4ed8", textDark: "#93c5fd", badge: "WARM" },
     };
     const s = map[phase];
-    const active = phase !== "idle";
     return {
-      icon,
-      label,
-      sublabel,
+      icon, label, sublabel, badge: s.badge, glow: phase !== "idle",
       borderColor: s.border,
-      bgColor: s.bg,
-      textColor: s.text,
-      badge: s.badge,
-      badgeTextColor: s.text,
+      bgColor: isDark ? s.bgDark : s.bg,
+      textColor: isDark ? s.textDark : s.text,
+      badgeTextColor: isDark ? s.textDark : s.text,
       badgeBgColor: `${s.border}22`,
-      glow: active,
     };
   }
 
   // db
   const dbActive = ["fetching-db", "populating"].includes(phase);
   return {
-    icon,
-    label,
-    sublabel,
+    icon, label, sublabel, glow: dbActive,
     borderColor: dbActive ? "#a78bfa" : "#c4b5fd",
-    bgColor: "#f5f3ff",
-    textColor: "#6d28d9",
+    bgColor: isDark ? "#1a1230" : "#f5f3ff",
+    textColor: isDark ? "#d8b4fe" : "#6d28d9",
     badge: phase === "fetching-db" ? "QUERY" : undefined,
-    badgeTextColor: "#6d28d9",
-    badgeBgColor: "#ede9fe",
-    glow: dbActive,
+    badgeTextColor: isDark ? "#d8b4fe" : "#6d28d9",
+    badgeBgColor: isDark ? "#2e1065" : "#ede9fe",
   };
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function CacheDiagram() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+
   const [phase, setPhase] = useState<Phase>("idle");
   const [hits, setHits] = useState(0);
   const [total, setTotal] = useState(0);
@@ -179,22 +172,23 @@ export function CacheDiagram() {
         id: "client",
         type: "cacheNode",
         position: { x: 90, y: 0 },
-        data: getCacheNodeData(phase, Monitor, "Client", "Browser / App", "client"),
+        data: getCacheNodeData(phase, Monitor, "Client", "Browser / App", "client", isDark),
       },
       {
         id: "cache",
         type: "cacheNode",
         position: { x: 90, y: 140 },
-        data: getCacheNodeData(phase, Zap, "Cache", "Redis · in-memory", "cache"),
+        data: getCacheNodeData(phase, Zap, "Cache", "Redis · in-memory", "cache", isDark),
       },
       {
         id: "db",
         type: "cacheNode",
         position: { x: 90, y: 290 },
-        data: getCacheNodeData(phase, Database, "Database", "PostgreSQL · disk", "db"),
+        data: getCacheNodeData(phase, Database, "Database", "PostgreSQL · disk", "db", isDark),
       },
     ],
-    [phase]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [phase, isDark]
   );
 
   const edges = useMemo(() => {
@@ -214,7 +208,7 @@ export function CacheDiagram() {
           : DIM,
         label: phase === "checking" ? "lookup" : phase === "hit" ? "data" : undefined,
         labelStyle: { fill: "#64748b", fontSize: 10, fontWeight: 500 },
-        labelBgStyle: { fill: "#ffffff", fillOpacity: 0.9 },
+        labelBgStyle: { fill: "hsl(var(--card))", fillOpacity: 0.95 },
         labelBgPadding: [4, 3] as [number, number],
         labelBgBorderRadius: 4,
       },
@@ -238,7 +232,7 @@ export function CacheDiagram() {
             ? "populate"
             : undefined,
         labelStyle: { fill: "#64748b", fontSize: 10, fontWeight: 500 },
-        labelBgStyle: { fill: "#ffffff", fillOpacity: 0.9 },
+        labelBgStyle: { fill: "hsl(var(--card))", fillOpacity: 0.95 },
         labelBgPadding: [4, 3] as [number, number],
         labelBgBorderRadius: 4,
       },
@@ -260,9 +254,9 @@ export function CacheDiagram() {
   };
 
   return (
-    <div className="not-prose my-8 rounded-xl border bg-slate-50 overflow-hidden">
+    <div className="not-prose my-8 rounded-xl border bg-background overflow-hidden">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b bg-card">
         <div className="flex items-center gap-3">
           <span className="text-xs font-medium text-muted-foreground">Cache-Aside Pattern</span>
           {hitRate !== null && (
@@ -302,7 +296,7 @@ export function CacheDiagram() {
           <button
             onClick={sendRequest}
             disabled={phase !== "idle"}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Play className="h-3 w-3" />
             Send Request
@@ -315,10 +309,10 @@ export function CacheDiagram() {
         className={cn(
           "px-4 py-2 text-[11px] border-b font-mono transition-colors duration-200",
           phase === "hit"
-            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+            ? "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900"
             : phase === "miss"
-            ? "bg-red-50 text-red-700 border-red-100"
-            : "bg-white text-muted-foreground"
+            ? "bg-red-50 text-red-700 border-red-100 dark:bg-red-950 dark:text-red-300 dark:border-red-900"
+            : "bg-card text-muted-foreground"
         )}
       >
         {statusMessage[phase]}
@@ -339,7 +333,7 @@ export function CacheDiagram() {
           panOnDrag={false}
           preventScrolling={false}
         >
-          <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#e2e8f0" />
+          <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="hsl(var(--border))" />
         </ReactFlow>
       </div>
     </div>

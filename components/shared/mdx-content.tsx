@@ -18,7 +18,7 @@ const mdxComponents = {
 
 export function MdxContent({ source, components }: MdxContentProps) {
   return (
-    <div className="prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-primary prose-code:before:content-none prose-code:after:content-none prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:rounded-none [&_pre_code]:text-[length:inherit] [&_pre_code]:leading-relaxed">
+    <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-primary prose-code:before:content-none prose-code:after:content-none prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:rounded-none [&_pre_code]:text-[length:inherit] [&_pre_code]:leading-relaxed">
       <MDXRemote
         source={source}
         components={{ ...mdxComponents, ...components }}

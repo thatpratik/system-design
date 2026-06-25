@@ -82,8 +82,8 @@ const NODES = [
       label: "Client",
       sublabel: "Browser / Mobile",
       border: "border-blue-400",
-      bg: "bg-blue-50",
-      text: "text-blue-700",
+      bg: "bg-blue-50 dark:bg-blue-950",
+      text: "text-blue-700 dark:text-blue-300",
     },
   },
   {
@@ -95,8 +95,8 @@ const NODES = [
       label: "Load Balancer",
       sublabel: "Round Robin",
       border: "border-amber-400",
-      bg: "bg-amber-50",
-      text: "text-amber-700",
+      bg: "bg-amber-50 dark:bg-amber-950",
+      text: "text-amber-700 dark:text-amber-300",
     },
   },
   {
@@ -108,8 +108,8 @@ const NODES = [
       label: "App Server",
       sublabel: "Scales horizontally",
       border: "border-emerald-400",
-      bg: "bg-emerald-50",
-      text: "text-emerald-700",
+      bg: "bg-emerald-50 dark:bg-emerald-950",
+      text: "text-emerald-700 dark:text-emerald-300",
     },
   },
   {
@@ -121,8 +121,8 @@ const NODES = [
       label: "Cache",
       sublabel: "Redis",
       border: "border-orange-400",
-      bg: "bg-orange-50",
-      text: "text-orange-700",
+      bg: "bg-orange-50 dark:bg-orange-950",
+      text: "text-orange-700 dark:text-orange-300",
     },
   },
   {
@@ -134,8 +134,8 @@ const NODES = [
       label: "Database",
       sublabel: "PostgreSQL",
       border: "border-violet-400",
-      bg: "bg-violet-50",
-      text: "text-violet-700",
+      bg: "bg-violet-50 dark:bg-violet-950",
+      text: "text-violet-700 dark:text-violet-300",
     },
   },
 ];
@@ -175,7 +175,7 @@ function buildEdges(mode: Mode) {
         opacity: active ? 1 : 0.3,
       },
       labelStyle: { fill: "#64748b", fontSize: 10, fontWeight: 500 },
-      labelBgStyle: { fill: "#ffffff", fillOpacity: 0.9 },
+      labelBgStyle: { fill: "hsl(var(--card))", fillOpacity: 0.95 },
       labelBgPadding: [4, 3] as [number, number],
       labelBgBorderRadius: 4,
       label: active ? e.label : undefined,
@@ -206,9 +206,9 @@ export function UrlShortenerDiagram() {
   ];
 
   return (
-    <div className="not-prose my-8 rounded-xl border bg-slate-50 overflow-hidden">
+    <div className="not-prose my-8 rounded-xl border bg-background overflow-hidden">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b bg-card">
         <div className="flex items-center gap-1">
           {modeButtons.map(({ value, label }) => (
             <button
@@ -229,7 +229,7 @@ export function UrlShortenerDiagram() {
         {/* Legend */}
         <div className="hidden sm:flex items-center gap-3">
           {LEGEND.map(({ color, label }) => (
-            <span key={label} className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span key={label} className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
               <span className={cn("h-2 w-2 rounded-full", color)} />
               {label}
             </span>
@@ -238,7 +238,7 @@ export function UrlShortenerDiagram() {
       </div>
 
       {/* Mode description */}
-      <div className="px-4 py-2 text-[11px] text-muted-foreground bg-white border-b">
+      <div className="px-4 py-2 text-[11px] text-muted-foreground bg-card border-b">
         {mode === "overview" && "Full architecture — all data flows between components."}
         {mode === "read"  && "Read path — client visits a short URL and gets redirected. App checks cache first; falls back to DB on a miss."}
         {mode === "write" && "Write path — client submits a long URL. App generates a short key, stores the mapping in the DB, and optionally warms the cache."}
@@ -262,7 +262,7 @@ export function UrlShortenerDiagram() {
             variant={BackgroundVariant.Dots}
             gap={24}
             size={1}
-            color="#e2e8f0"
+            color="hsl(var(--border))"
           />
           <Controls showInteractive={false} />
         </ReactFlow>
