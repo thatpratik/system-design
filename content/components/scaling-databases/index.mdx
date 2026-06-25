@@ -50,21 +50,27 @@ Most applications never need to go past Level 3. Measure before moving up.
 
 ---
 
-## Level 1 — Vertical Scaling
+## Vertical Scaling
 
-The simplest move: give the database more CPU, RAM, and faster disks.
+Scale up the machine the database already runs on. No new instances, no topology changes, no application code changes — just more resources on the same node.
 
-**What it fixes:** The database is CPU-bound (complex queries), I/O-bound (buffer pool too small for the working set), or connection-limited.
+**Ceiling:** Bounded by the largest available machine. Cloud instances top out, and the cost curve is non-linear — the largest instance may cost 8× the next tier while delivering 2× improvement. Once you hit that ceiling, the only path forward is horizontal.
 
-**How RAM helps:** The database buffer pool caches hot data pages in memory. Doubling RAM can eliminate a large fraction of disk reads if the working set fits. A common rule of thumb: if your buffer pool hit rate is below 95%, more RAM will help more than a faster disk.
-
-**Limits:** Vertical scaling is bounded by the largest available machine. Cloud instances top out, and the cost curve is non-linear — the largest instance may cost 8× as much as the next tier while delivering 2× improvement.
-
-**When to apply:** Before any horizontal technique. It requires no application changes.
+**When to apply:** Always exhaust vertical options before introducing horizontal complexity. The operational overhead difference is enormous.
 
 ---
 
-## Level 2 — Connection Pooling
+### Level 1 — Hardware Upgrade
+
+Give the database more CPU, RAM, and faster disks.
+
+**What it fixes:** The database is CPU-bound (complex queries), I/O-bound (buffer pool too small for the working set), or hitting disk throughput limits.
+
+**How RAM helps:** The database buffer pool caches hot data pages in memory. Doubling RAM can eliminate a large fraction of disk reads if the working set fits. A common rule of thumb: if your buffer pool hit rate is below 95%, more RAM will help more than a faster disk.
+
+---
+
+### Level 2 — Connection Pooling
 
 Every database connection consumes memory on the server (PostgreSQL uses ~5–10 MB per connection). Applications with many concurrent threads or serverless functions can exhaust available connections before hitting any CPU or I/O limit.
 
@@ -92,19 +98,15 @@ A **connection pooler** sits between the application and the database, multiplex
 
 ## Horizontal Scaling
 
-Where vertical scaling makes one machine bigger, horizontal scaling adds more machines to share the load. The database is no longer a single node — work is distributed across multiple instances.
+Add more machines to share the load. No hard ceiling — you can keep adding replicas, cache nodes, or shards as demand grows.
 
-**What it fixes:** Vertical scaling hits a hard ceiling (the largest available machine). Horizontal scaling has no equivalent ceiling: you can keep adding replicas, cache nodes, or shards as demand grows. It is the correct approach once vertical scaling stops being cost-effective or reaches its physical limit.
+**The fundamental trade-off:** A single machine is trivially consistent. The moment you distribute state across multiple nodes, consistency becomes something you actively manage. Replicas may lag behind the primary, caches may hold stale data, shards cannot easily answer queries that cross partition boundaries. Every horizontal technique below is a point on the consistency-vs-scalability spectrum — choose based on what your application can tolerate.
 
-**How it works:** Reads and writes are split. Reads are fanned out across replicas or served from a cache. Writes are either funnelled through a single primary (Levels 3–5) or partitioned across multiple primaries via sharding (Level 6).
-
-**The trade-off horizontal scaling always introduces:** Consistency. A single machine is trivially consistent. Distributing state means replicas may lag behind the primary, caches may hold stale data, and shards cannot easily answer queries that span multiple partitions. Every horizontal technique in Levels 3–6 is a point on the consistency-vs-scalability spectrum — choose based on what your application can tolerate.
-
-**When to apply:** After connection pooling (Level 2) is in place and vertical scaling (Level 1) is no longer cost-effective or is approaching its limit.
+Levels 3–5 scale **reads**. The primary still handles all writes, so write throughput is unchanged. Level 6 is the only technique that scales **writes**.
 
 ---
 
-## Level 3 — Read Replicas
+### Level 3 — Read Replicas
 
 The primary handles all writes. Replicas receive a stream of changes (WAL in PostgreSQL, binlog in MySQL) and apply them asynchronously, staying nearly in sync.
 
@@ -135,7 +137,7 @@ Mitigation strategies for lag:
 
 ---
 
-## Level 4 — Caching Layer
+### Level 4 — Caching Layer
 
 A cache (Redis, Memcached) sits in front of the database and serves frequently read data from memory without touching the database at all.
 
@@ -168,7 +170,7 @@ return value
 
 ---
 
-## Level 5 — CQRS and Purpose-Built Read Models
+### Level 5 — CQRS and Purpose-Built Read Models
 
 **Command Query Responsibility Segregation (CQRS)** separates the write model (commands, normalised RDBMS) from the read model (queries, denormalised store optimised for specific access patterns).
 
@@ -191,9 +193,9 @@ Read path:    API ──► Query Handler  ──► Read Store ◄┘
 
 ---
 
-## Level 6 — Sharding
+### Level 6 — Sharding
 
-When writes saturate the primary and vertical scaling has no room left, the write workload must be split across multiple independent database instances. Each instance (shard) owns a partition of the data.
+The only technique that scales **writes**. When writes saturate the primary and vertical scaling has no room left, the write workload is split across multiple independent database instances. Each instance (shard) owns a partition of the data.
 
 This is covered in depth in the [Database Sharding](/components/database-sharding) component. The key point in the scaling context:
 
