@@ -57,6 +57,11 @@ const EDGE_DEFAULTS = {
   style: { stroke: "#cbd5e1", strokeWidth: 1.5 },
   markerEnd: { type: MarkerType.ArrowClosed, color: "#94a3b8", width: 14, height: 14 },
 };
+const EDGE_STRAIGHT = {
+  type: "straight" as const,
+  style: { stroke: "#cbd5e1", strokeWidth: 1.5 },
+  markerEnd: { type: MarkerType.ArrowClosed, color: "#94a3b8", width: 14, height: 14 },
+};
 
 export function FacebookFeedGraph() {
   const { resolvedTheme } = useTheme();
@@ -83,11 +88,11 @@ export function FacebookFeedGraph() {
   }, [resolvedTheme]);
 
   const edges = useMemo(() => [
-    { id: "c-lb",    source: "client",    target: "lb",        ...EDGE_DEFAULTS },
-    { id: "lb-ws",   source: "lb",        target: "ws",        ...EDGE_DEFAULTS },
+    { id: "c-lb",    source: "client",    target: "lb",        ...EDGE_STRAIGHT },
+    { id: "lb-ws",   source: "lb",        target: "ws",        ...EDGE_STRAIGHT },
     { id: "ws-db",   source: "ws",        target: "db",        ...EDGE_DEFAULTS },
     { id: "ws-agg",  source: "ws",        target: "agg",       ...EDGE_DEFAULTS },
-    { id: "agg-fg",  source: "agg",       target: "fg",        ...EDGE_DEFAULTS },
+    { id: "agg-fg",  source: "agg",       target: "fg",        ...EDGE_STRAIGHT },
     { id: "fg-post", source: "fg",        target: "post",      ...EDGE_DEFAULTS },
     { id: "fg-fol",  source: "fg",        target: "followers", ...EDGE_DEFAULTS },
     { id: "post-r",  source: "post",      target: "ranker",    ...EDGE_DEFAULTS },
