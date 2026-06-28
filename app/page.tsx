@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <div className="container py-16 space-y-16">
 
-      {/* ── What is System Design? ─────────────────────────────── */}
+      {/* ── What is System Design? ──────────────────────────────── */}
       <section className="animate-fade-in-up">
         <h1 className="font-display text-3xl sm:text-4xl tracking-tight mb-4 text-foreground">
           What is System Design?
@@ -17,7 +17,7 @@ export default function Home() {
         </p>
       </section>
 
-      {/* ── How to Approach a Problem ──────────────────────────── */}
+      {/* ── How to Approach a Problem ───────────────────────────── */}
       <section className="animate-fade-in-up" style={{ animationDelay: "80ms" }}>
         <h2 className="font-display text-2xl sm:text-3xl tracking-tight mb-6 text-foreground">
           How to Approach a Problem
