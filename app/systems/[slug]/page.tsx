@@ -7,10 +7,12 @@ import { MdxContent } from "@/components/shared/mdx-content";
 import { CategoryBadge } from "@/components/shared/category-badge";
 import { Separator } from "@/components/ui/separator";
 import { UrlShortenerDiagram } from "@/components/visualizations/url-shortener-diagram";
+import { FacebookFeedGraph } from "@/components/visualizations/facebook-feed-graph";
 import { TldrButton } from "@/components/shared/tldr-button";
 
 const systemVisualizations: Record<string, Record<string, React.ComponentType>> = {
   "url-shortener": { UrlShortenerDiagram },
+  "feed-system": { FacebookFeedGraph },
 };
 
 interface Props {
