@@ -1,0 +1,102 @@
+---
+title: "Blob Storage"
+slug: "blob-storage"
+category: "storage"
+sequence: 2
+summary: "Object storage for unstructured binary data — images, videos, and documents — addressed by unique keys and served at global scale."
+usedIn:
+  - "chat-system"
+alternatives:
+  - "cdn"
+externalLinks:
+  - label: "AWS S3 Developer Guide"
+    url: "https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html"
+  - label: "Google Cloud Storage Overview"
+    url: "https://cloud.google.com/storage/docs/introduction"
+  - label: "Cloudflare R2 Documentation"
+    url: "https://developers.cloudflare.com/r2/"
+strengths:
+  - "Virtually unlimited capacity — no schema or size constraints per object"
+  - "Pre-signed URLs enable direct client uploads without proxying through app servers"
+  - "Integrates directly with CDNs for global low-latency delivery"
+weaknesses:
+  - "Not suitable for structured queries — key-only access"
+  - "Eventual consistency on some providers for list and read-after-overwrite"
+bestFor:
+  - "User-uploaded media: profile images, attachments, video"
+  - "Static assets, backups, data lake storage"
+notFor:
+  - "Structured relational data or frequent small reads and writes"
+  - "Low-latency in-memory caching"
+---
+
+## What is Blob Storage?
+
+Blob storage (Binary Large Object storage) is an object storage system for unstructured data. Unlike a relational database that organises data into rows and columns, blob storage organises data into **buckets** (containers) and **objects** (files), each addressed by a unique key.
+
+```
+bucket: user-media
+  └── avatars/user-8821.jpg
+  └── attachments/chat-msg-001.pdf
+  └── videos/tutorial-intro.mp4
+```
+
+There is no schema, no query language, and no relationships. Every object is a blob of bytes with an optional metadata map. The tradeoff: virtually unlimited scale with zero schema management.
+
+## Problem it Solves
+
+Storing binary files in a relational database is expensive and slow:
+
+- **Row size limits**: Most databases have per-row or per-column size limits; performance degrades well before physical limits are reached.
+- **Backup cost**: Database backups copy everything — including multi-GB video files alongside critical financial records.
+- **Bandwidth**: Serving images through a database connection pool wastes connection slots and adds unnecessary latency.
+
+Blob storage separates file content from structured data. The database stores only the object key; the file lives in object storage, served directly to clients.
+
+## How it Works
+
+### Write path (upload)
+
+1. Client requests a **pre-signed URL** from the application server
+2. Application generates a time-limited URL signed with storage credentials (no file data passes through app servers)
+3. Client uploads directly to blob storage via the pre-signed URL
+4. Application stores the object key in the database (e.g., `avatars/user-8821.jpg`)
+
+### Read path (download)
+
+1. Client requests a resource from the application
+2. Application returns the public URL (or a fresh pre-signed URL for private objects)
+3. Client fetches the object directly from blob storage or a CDN edge that caches it
+
+```
+Write:  Client ──► App Server ──► Pre-signed URL
+        Client ──────────────────────────────────► Blob Storage (direct upload)
+
+Read:   Client ──► CDN Edge ──► Blob Storage (on miss)
+```
+
+## Provider Comparison
+
+| | **AWS S3** | **Google Cloud Storage** | **Azure Blob** | **Cloudflare R2** |
+|---|---|---|---|---|
+| Pricing model | Per GB + requests + egress | Per GB + requests + egress | Per GB + operations + egress | Per GB + requests, no egress fees |
+| Consistency | Strong (since 2020) | Strong | Strong | Strong |
+| Geo-redundancy | Multi-region (optional) | Multi-region (optional) | Geo-redundant options | Global by default |
+| CDN integration | CloudFront | Cloud CDN | Azure CDN | Cloudflare CDN (native) |
+| Best for | AWS-native stacks, richest ecosystem | GCP workloads, ML data lakes | Azure-native workloads | Egress-sensitive workloads |
+
+## Trade-offs
+
+| | Benefit | Cost |
+|---|---|---|
+| **Scale** | Store petabytes with no schema planning | Key-only access — no range queries or filters |
+| **Cost** | Cheaper per GB than managed DB storage | Egress fees can become significant at scale |
+| **Simplicity** | No migrations, no schema evolution | Application must manage its own key structure |
+| **Security** | Fine-grained IAM and pre-signed URLs | Public misconfiguration has caused major data leaks |
+
+## Real-World Usage
+
+- **WhatsApp / iMessage**: Photos and videos stored in S3 or equivalent; messages in the chat DB store only the object key
+- **Instagram**: User-uploaded photos stored in object storage, served through a CDN layer for global low-latency delivery
+- **Dropbox**: Initially stored all files in S3; eventually migrated to their own distributed object store (Magic Pocket) at multi-exabyte scale
+- **Slack**: File attachments stored in S3; download URLs are pre-signed and expire after a short window
