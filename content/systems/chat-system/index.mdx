@@ -1,0 +1,116 @@
+---
+title: "Chat System"
+slug: "chat-system"
+summary: "Distributed real-time messaging platform supporting 1:1 and group conversations with persistent history and online presence."
+category: "system"
+components:
+  - "load-balancer"
+  - "api-gateway"
+  - "caching"
+  - "non-relational-databases"
+  - "message-queue"
+  - "blob-storage"
+externalLinks:
+  - label: "How Discord Stores Billions of Messages"
+    url: "https://discord.com/blog/how-discord-stores-billions-of-messages"
+  - label: "Facebook Messenger Architecture"
+    url: "https://engineering.fb.com/2021/10/05/networking-traffic/messenger/"
+  - label: "Slack's Real-Time Messaging"
+    url: "https://slack.engineering/real-time-messaging/"
+---
+
+## What is a Chat System?
+
+A chat system allows users to exchange messages in real time — either one-on-one or in groups. Modern chat systems (WhatsApp, Slack, Discord) must handle millions of concurrent users, guarantee message delivery, and persist conversation history indefinitely.
+
+## Functional Requirements
+
+- 1:1 and group messaging (groups up to 500 members)
+- Message persistence and history retrieval
+- Online presence indicators (online / offline / last seen)
+- Read receipts
+- Media attachments (images, files)
+
+## Non-Functional Requirements
+
+- Message delivery latency < 100 ms end-to-end
+- 99.99% availability — users expect chat to always work
+- Strong message ordering within a conversation
+- Support for 50M daily active users
+
+## High-Level Architecture
+
+```
+Client ──► Load Balancer ──► WebSocket Servers ──► Message Queue ──► Fan-out Workers
+                                    │
+                             API Gateway ──► REST Services (history, presence, auth)
+                                    │
+                               NoSQL DB (messages, users)
+                               Cache (recent messages, presence)
+                               Blob Storage (media attachments)
+```
+
+Clients maintain persistent WebSocket connections to a pool of stateless WebSocket servers. REST endpoints (via the API Gateway) handle non-real-time operations: loading history, managing contacts, and authentication.
+
+## How it Works
+
+### Sending a message
+
+1. Sender's client sends a message over its open WebSocket connection
+2. WebSocket server assigns a sequence ID and persists the message to the NoSQL database
+3. WebSocket server publishes an event to the message queue: `{ conversation_id, message_id, recipient_ids }`
+4. Fan-out workers consume the event and look up each recipient's current WebSocket server
+5. Each WebSocket server pushes the message to recipients' open connections
+6. Recipients' clients send a delivery acknowledgment; the sender receives a "delivered" receipt
+
+### Receiving when offline
+
+If the recipient is offline, the message is stored in the NoSQL database. When they reconnect, the client fetches unread messages since its last known sequence ID.
+
+## Key Design Decisions
+
+### WebSocket vs HTTP Long-Polling vs SSE
+
+| | WebSocket | HTTP Long-Polling | Server-Sent Events |
+|---|---|---|---|
+| Direction | Full-duplex | Client-initiated pull | Server-to-client only |
+| Latency | Lowest | Higher (re-establish per poll) | Low for server push |
+| Complexity | Higher (connection management) | Simple | Medium |
+| Best for | Chat, gaming, collaborative editing | Notifications, lower update frequency | Live feeds, dashboards |
+
+WebSocket is the standard choice for chat. It lets the server push messages to clients without polling, which is critical for real-time feel.
+
+### Message Storage Schema
+
+Wide-column stores like Cassandra are ideal for chat because queries are always scoped to a single conversation.
+
+```sql
+CREATE TABLE messages_by_conversation (
+  conversation_id  UUID,
+  sequence_id      BIGINT,
+  message_id       UUID,
+  sender_id        UUID,
+  body             TEXT,
+  PRIMARY KEY (conversation_id, sequence_id)
+) WITH CLUSTERING ORDER BY (sequence_id DESC);
+```
+
+All messages for a conversation are colocated on one node. Fetching the last 50 messages is a single-partition range scan.
+
+### Message Ordering
+
+Each WebSocket server assigns a monotonically increasing sequence ID per conversation. This prevents out-of-order display when two clients send messages within milliseconds of each other.
+
+### Group Chat Fan-out
+
+- **Small groups (< 100 members)**: Push to every member's WebSocket server immediately (fan-out on write).
+- **Large groups (100–500 members)**: Store the message once; members pull on open via the sequence ID cursor (fan-out on read).
+
+The hybrid avoids pushing to 500 connections for every message while still delivering low latency for small groups.
+
+## Scaling Considerations
+
+- **WebSocket server scaling**: Servers are stateless; the load balancer routes new connections with consistent hashing (same user → same server improves cache locality). A Redis pub/sub layer routes fan-out messages between servers.
+- **Message storage**: Partition messages by `conversation_id`. Most queries are scoped to one conversation, so cross-shard queries are rare.
+- **Presence service**: Track online status in Redis with TTL-based heartbeats (client sends a heartbeat every 30s; key expires after 60s).
+- **Media**: Use blob storage with pre-signed upload URLs. The chat message stores only the object key; the client fetches media directly from storage or a CDN.

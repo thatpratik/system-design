@@ -1,0 +1,108 @@
+---
+title: "Feed System"
+slug: "feed-system"
+summary: "Social feed generation service that aggregates, ranks, and serves personalized content at scale using fan-out-on-write or fan-out-on-read strategies."
+category: "system"
+components:
+  - "load-balancer"
+  - "caching"
+  - "non-relational-databases"
+  - "database-sharding"
+  - "message-queue"
+externalLinks:
+  - label: "Facebook News Feed Ranking"
+    url: "https://engineering.fb.com/2021/01/26/ml-applications/news-feed-ranking/"
+  - label: "Twitter Timeline Architecture"
+    url: "https://blog.twitter.com/engineering/en_us/topics/infrastructure/2017/the-infrastructure-behind-twitter-scale"
+  - label: "Instagram Feed Engineering"
+    url: "https://instagram-engineering.com/types-of-fb-connections-on-the-platform-7a4a8d7f0ffa"
+---
+
+## What is a Feed System?
+
+A feed system (news feed, timeline) aggregates and ranks content from users you follow and surfaces the most relevant posts. It is one of the most read-heavy, latency-sensitive systems in social products — loading a feed must feel instant, yet it draws from hundreds of followed accounts and ranks thousands of candidate posts.
+
+## Problem it Solves
+
+A naive feed implementation queries the database at read time: "Give me all posts from all accounts I follow, sorted by time." This works at small scale but breaks down fast:
+
+- A user following 1,000 accounts generates a cross-shard JOIN across millions of rows on every page load
+- At 100M users, even a cache-friendly read is a problem because the result set is different for every user
+- A celebrity posting to 10M followers requires delivering a single post to 10M feed entries
+
+The core design question is **when to fan out** — at write time (push) or at read time (pull)?
+
+## How it Works
+
+<FacebookFeedGraph />
+
+When user A publishes a post:
+
+1. Post is written to the **Posts service** (NoSQL, sharded by `user_id`)
+2. A fan-out event is published to the **message queue**
+3. **Fan-out workers** consume the event and determine the delivery strategy
+4. For regular followers: the post ID is appended to each follower's pre-computed feed in cache
+5. For celebrity accounts (> 1M followers): skip push; followers pull at read time
+
+When a user opens their feed:
+
+1. Load balancer routes the request to a web server
+2. Web server fetches the user's pre-computed feed (list of post IDs) from the feed cache
+3. Recent posts from any followed celebrity accounts are fetched at read time and merged
+4. The **Ranker** scores and re-orders the merged list
+5. The ranked result is cached and returned; subsequent pagination uses the same cache
+
+## Fan-out Strategies
+
+| | **Fan-out on Write (Push)** | **Fan-out on Read (Pull)** | **Hybrid** |
+|---|---|---|---|
+| When fan-out happens | On post creation | On feed request | Write for regular users; read for celebrities |
+| Read latency | Very low — feed pre-computed | Higher — aggregate at read time | Low for most reads |
+| Write latency | Higher — fan out to all followers | Very low | Moderate |
+| Storage cost | High — N feed entries per post | Low — store once | Medium |
+| Celebrity problem | Catastrophic — 10M writes per post | Fine — one post stored | Handled by skipping push above threshold |
+| Used by | Early Twitter, early Facebook | Reddit (pull-heavy) | Instagram, modern Twitter, Facebook |
+
+## Key Design Decisions
+
+### Fan-out threshold
+
+Define a follower count above which fan-out on write is skipped (commonly 1M followers). For these accounts the feed service merges their recent posts at read time and caches the merged result separately.
+
+### Feed storage schema
+
+Feeds are stored as sorted lists of post IDs — not full post content — in Redis:
+
+```
+key:   feed:{user_id}
+type:  sorted set
+score: rank_score or timestamp
+value: post_id
+size:  last 1,000 entries per user
+```
+
+Full post content is fetched from the posts service separately. This keeps feeds small and lets engagement counts (likes, comments) stay fresh without invalidating the feed.
+
+### Ranking
+
+The ranker scores candidate posts using signals: recency, engagement rate, relationship strength, content type, and the user's past interactions. Ranking runs asynchronously — the user sees a cached ranked feed on load; the cache is refreshed in the background every few minutes.
+
+### Sharding
+
+Posts are sharded by `user_id`. Feed entries (follower → list of post IDs) are also sharded by `follower_id` so each user's feed lives on one shard.
+
+## Scaling Considerations
+
+- **Fan-out queue**: A high-throughput partitioned queue absorbs the burst when a celebrity post triggers millions of fan-out jobs in seconds.
+- **Feed cache TTL**: Feeds for inactive users expire quickly (hours); active users' feeds are refreshed continuously.
+- **Cursor-based pagination**: Use a feed pointer (last seen post ID + rank score) rather than OFFSET, which requires full scans.
+- **Read replicas**: Post data is read-heavy; serve from read replicas of the posts shards to reduce primary write load.
+
+## Trade-offs
+
+| | Benefit | Cost |
+|---|---|---|
+| **Read latency** | Pre-computed feeds return in milliseconds | High write amplification for users with many followers |
+| **Storage** | Fan-out on write pre-computes per-user feeds | Significant Redis memory per active user |
+| **Freshness** | Background refresh keeps ranked feeds current | Ranking is eventually consistent, not real-time |
+| **Complexity** | Hybrid approach handles celebrity accounts | Two code paths (push / pull) must stay in sync |

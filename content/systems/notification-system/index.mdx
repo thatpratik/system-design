@@ -1,0 +1,102 @@
+---
+title: "Notification System"
+slug: "notification-system"
+summary: "Event-driven system for delivering push notifications, emails, and SMS to millions of users with guaranteed delivery and deduplication."
+category: "system"
+components:
+  - "load-balancer"
+  - "api-gateway"
+  - "message-queue"
+  - "non-relational-databases"
+  - "caching"
+externalLinks:
+  - label: "How Uber Handles Millions of Notifications"
+    url: "https://eng.uber.com/uber-pushout-how-ubers-ios-team-made-doing-nothing-awesome/"
+  - label: "Airbnb Notification Platform"
+    url: "https://medium.com/airbnb-engineering/building-airbnbs-notification-platform-3c77a06ad25e"
+  - label: "Apple Push Notification Service"
+    url: "https://developer.apple.com/documentation/usernotifications"
+---
+
+## What is a Notification System?
+
+A notification system delivers messages to users across multiple channels — push notifications, email, and SMS — in response to events in the product. When a user receives a like, a package ships, or a payment clears, the notification system is responsible for getting that signal to the user reliably and quickly.
+
+## Types of Notifications
+
+| Channel | Provider | Latency | Best for |
+|---|---|---|---|
+| **Push notification** | APNs (iOS), FCM (Android) | < 1 s | Real-time alerts, re-engagement |
+| **Email** | SendGrid, SES, Mailgun | Seconds–minutes | Receipts, digests, marketing |
+| **SMS** | Twilio, AWS SNS | < 5 s | OTPs, critical alerts, high-urgency |
+| **In-app** | Custom WebSocket / polling | < 1 s | Activity feeds, badge counts |
+
+## How it Works
+
+```
+Event Source ──► Notification Service ──► Message Queue (per channel)
+                        │                        │
+                 User Preferences DB      Dispatcher Workers ──► Provider APIs
+                 (NoSQL)                                          (APNs, FCM, SES, Twilio)
+                        │
+                 Cache (device tokens,
+                        preference lookups)
+```
+
+1. An event is triggered (user A liked user B's photo)
+2. The notification service loads user B's preferences from cache or NoSQL
+3. If user B has not opted out and the channel is active, a notification job is published to the appropriate queue
+4. Dispatcher workers consume from the queue and call the provider API
+5. The provider delivers to the user's device or inbox
+6. Delivery status is written back to the database for the activity feed
+
+## Key Design Decisions
+
+### Idempotency and Deduplication
+
+Events can be published multiple times (at-least-once delivery from the queue). Without deduplication, a user could receive the same notification twice.
+
+Each notification is assigned a **dedup key** stored in the NoSQL database. Before dispatching, the worker checks whether a notification with this key was already sent.
+
+```
+dedup_key = hash("like", liker_id=42, post_id=9821, window="2026-06-29T14:00")
+
+IF dedup_key not in notif_sent_table:
+  send_notification(...)
+  mark_as_sent(dedup_key, ttl=24h)
+```
+
+### Dead-Letter Queue
+
+If a provider API call fails (APNs returns a timeout, Twilio is down), the message is retried with exponential backoff. After N retries, the message moves to a **dead-letter queue (DLQ)** for manual inspection and replay.
+
+### User Preferences
+
+Users can opt out of specific channels or notification types. Preferences are stored in NoSQL (`user_id → { push: true, email: false, sms: true, ... }`) and cached aggressively — they change rarely but are read for every notification.
+
+### Template Rendering
+
+Notification content is templated. Workers fetch the template, substitute variables, and send the rendered text to the provider. Templates live in NoSQL keyed by notification type, making it easy to update copy without a code deploy.
+
+## Scaling Considerations
+
+- **Separate queues per channel**: Push, email, and SMS have different throughput characteristics and failure modes. Separate queues let each scale independently and prevent a slow email provider from blocking push delivery.
+- **Rate limiting against providers**: Provider APIs have per-second send limits. Workers use a Redis-backed token bucket to stay within quota without over-provisioning.
+- **Email batching**: For digest emails (weekly summaries), batch multiple events into one email in an aggregation step before dispatching.
+- **Priority queues**: Critical notifications (OTPs, security alerts) bypass normal queues and use a high-priority queue to ensure delivery even under load.
+
+## Trade-offs
+
+| | Benefit | Cost |
+|---|---|---|
+| **Reliability** | Queue-backed retry handles transient provider failures | More complex error handling and DLQ monitoring |
+| **Decoupling** | Event sources don't know about delivery channels | End-to-end tracing across queue → dispatcher → provider is harder |
+| **Scale** | Dispatcher workers scale horizontally per channel | Risk of duplicate delivery if dedup logic has a bug |
+| **Flexibility** | Add new channels by adding a new dispatcher | User preference storage must be fast and always available |
+
+## Real-World Usage
+
+- **Firebase Cloud Messaging (FCM)**: Google's push notification service; handles billions of messages per day across Android and web
+- **Apple Push Notification Service (APNs)**: Required for all iOS notifications; enforces per-certificate rate limits
+- **AWS SNS + SES**: Managed fan-out for push/SMS (SNS) and transactional email (SES); commonly used together in serverless architectures
+- **Twilio**: The dominant SMS provider for programmatic delivery; offers delivery webhooks and global carrier routing

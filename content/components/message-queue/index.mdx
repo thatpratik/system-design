@@ -1,0 +1,98 @@
+---
+title: "Message Queue"
+slug: "message-queue"
+category: "messaging"
+sequence: 1
+summary: "Durable broker that decouples producers from consumers, enabling async, reliable message delivery at scale."
+usedIn:
+  - "chat-system"
+  - "notification-system"
+  - "feed-system"
+alternatives:
+  - "caching"
+externalLinks:
+  - label: "Apache Kafka Documentation"
+    url: "https://kafka.apache.org/documentation/"
+  - label: "RabbitMQ Tutorials"
+    url: "https://www.rabbitmq.com/tutorials"
+  - label: "AWS SQS Developer Guide"
+    url: "https://docs.aws.amazon.com/AQSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html"
+strengths:
+  - "Decouples producers from consumers — each can scale independently"
+  - "Durable storage guarantees no message loss on consumer failure"
+  - "Fan-out to multiple consumer groups without re-sending"
+weaknesses:
+  - "Adds latency compared to direct synchronous calls"
+  - "Operational complexity: brokers need monitoring and replication"
+bestFor:
+  - "Event-driven pipelines where producers and consumers scale independently"
+  - "Reliable async delivery: notifications, emails, background jobs"
+notFor:
+  - "Sub-millisecond synchronous request/response flows"
+  - "Simple caching or key-value lookups"
+---
+
+## What is a Message Queue?
+
+A message queue is an asynchronous communication buffer between services. Producers write messages to the queue; consumers read from it at their own pace. The queue acts as a durable, ordered buffer between them — neither side needs to be available at the same time.
+
+The two dominant models are:
+
+- **Queue** (point-to-point): Each message is delivered to exactly one consumer. Used for task distribution and work queues.
+- **Topic** (publish/subscribe): Each message is delivered to every subscriber. Used for event broadcasting and fan-out.
+
+## Problem it Solves
+
+Without a queue, services call each other directly. This creates three problems:
+
+1. **Tight coupling**: The producer must know the consumer's address and wait for a response.
+2. **Traffic spikes**: A sudden burst of writes overwhelms the consumer if it can't keep up.
+3. **Cascading failures**: If the consumer is down, the producer's request fails immediately.
+
+A queue absorbs spikes, decouples services, and buffers messages until the consumer is ready.
+
+## How it Works
+
+1. **Producer** publishes a message to a named topic or queue
+2. **Broker** persists the message to durable storage (disk or replication)
+3. **Consumer** polls or is pushed the message
+4. **Consumer processes** the message and sends an acknowledgment (ack)
+5. **Broker** marks the message as consumed; unacked messages are re-delivered after a timeout
+
+If the consumer crashes mid-processing, the broker redelivers the message to another consumer — nothing is lost.
+
+## Queue vs Topic (Pub/Sub)
+
+| | **Queue** | **Topic (Pub/Sub)** |
+|---|---|---|
+| Delivery target | One consumer receives each message | All subscribers receive every message |
+| Use case | Task queues, background jobs | Event broadcasting, fan-out |
+| Scaling | Add consumers to increase throughput | Consumers scale independently per subscriber group |
+| Example | SQS, RabbitMQ queue | Kafka topic, SNS, Redis Pub/Sub |
+
+## Broker Comparison
+
+| | **Apache Kafka** | **RabbitMQ** | **AWS SQS** | **Redis Streams** |
+|---|---|---|---|---|
+| Model | Log (topic + partitions) | Queue / Exchange | Queue | Log (consumer groups) |
+| Ordering | Per-partition | Per-queue | Not guaranteed (FIFO optional) | Per-stream |
+| Throughput | Very high (millions/s) | High | High (managed) | High |
+| Retention | Configurable (days–forever) | Until consumed | 4 days (max 14) | Configurable |
+| Delivery guarantee | At-least-once (exactly-once configurable) | At-least-once | At-least-once | At-least-once |
+| Best for | Event streaming, audit logs, replay | Task queues, routing by key | Simple async jobs, managed | Lightweight streaming in Redis |
+
+## Trade-offs
+
+| | Benefit | Cost |
+|---|---|---|
+| **Decoupling** | Producer and consumer evolve independently | System becomes more distributed — harder to trace end-to-end |
+| **Resilience** | Messages survive consumer restarts | Requires dead-letter queues and retry logic |
+| **Throughput** | Consumers scale horizontally | Ordering across partitions is not guaranteed |
+| **Observability** | Queue depth is a natural backpressure metric | More moving parts to monitor |
+
+## Real-World Usage
+
+- **Kafka at LinkedIn**: Originally built for activity stream processing; now handles trillions of messages per day across all LinkedIn services
+- **SQS at AWS**: Managed queue service used across countless AWS architectures for decoupling microservices and background jobs
+- **RabbitMQ**: Common choice for task queues in web applications — email sending, image processing, PDF generation
+- **Redis Streams**: Lightweight alternative when Redis is already in the stack and message volume is moderate
